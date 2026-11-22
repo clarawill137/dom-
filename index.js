@@ -3,6 +3,7 @@
 // хедканоны Life — общая полка (что висит на холодильнике, модель знает).
 
 import * as C from './core.js';
+import * as D from './data.js';
 import * as U from './ui.js';
 
 const ID = 'dom';
@@ -83,7 +84,15 @@ function registerSlash() {
 }
 
 // для Life и соседей
-globalThis.Dom = { version: C.VERSION, open: (room) => U.open(room || null), openGen: () => U.open(null, true) };
+globalThis.Dom = {
+    version: C.VERSION, open: (room) => U.open(room || null), openGen: () => U.open(null, true),
+    // соседям (Зёрнышко): вещь в дом — например, купленное приданое встаёт в Детскую; имена малыша — общая доска
+    add: (kind, x = {}) => { const k = D.KINDS[kind] ? kind : 'decor'; const it = C.addItem(k, { ...x }, { src: 'zr', room: x.room || D.KINDS[k].room || '' }); if (it.room && !it.spot) it.spot = D.DEFAULT_SPOT?.[k] || 'shelf'; C.touch(); try { U.renderSoon(); } catch { /* */ } return it.id; },
+    names: () => C.itemsOf('name').map(x => ({ id: x.id, name: x.name, meaning: x.meaning || x.desc || '', votes: { ...(x.votes || {}) } })),
+    addName: (x = {}) => { const it = C.addItem('name', { name: String(x.name || '').trim(), meaning: x.meaning || '' }, { src: 'zr' }); C.touch(); try { U.renderSoon(); } catch { /* */ } return it.id; },
+    vote: (id, who, v) => { C.vote(id, who, v); try { U.renderSoon(); } catch { /* */ } },
+    setImg: (id, img) => { C.setItem(id, { img }); try { U.renderSoon(); } catch { /* */ } },
+};
 
 jQuery(async () => {
     C.cfg();
