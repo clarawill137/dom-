@@ -348,7 +348,7 @@ function shopSheet() {
     const bal = C.balance();
     const k = `shop:${cat}`;
     return `<div class="dm-sheet">${sheetHead(`${ic('bag')} Покупки`)}
-        <div class="dm-hint">${bal ? `${ic('pin')} на счету ${esc(bal.text)} — оплата с телефона` : 'банк Телефона не найден — покупки без списания'}</div>
+        <div class="dm-hint">${bal ? `${ic('pin')} на счету ${esc(bal.text)} — ${bal.life ? 'платит тот, кто платит за дом (Life → Деньги)' : 'оплата с телефона'}` : 'банк Телефона не найден — покупки без списания'}</div>
         <div class="dm-chips">${D.SHOP_CATS.map(([v, l]) => `<button class="dm-chip${cat === v ? ' on' : ''}" data-dm="shopCat" data-v="${v}">${esc(l)}</button>`).join('')}</div>
         <div class="dm-ask"><input data-dmf="shop:ask" value="${esc(ui.shop.ask)}" placeholder="что ищем: «лампу с тёплым светом для его кресла»">${btn('shopGen', busy(k) ? spin : ic('sparkles'), attr({ title: 'Показать' }), 'ico primary')}</div>
         ${list.length ? `<div class="dm-goods">${list.map((x, i) => `<div class="dm-good">

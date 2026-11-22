@@ -571,18 +571,21 @@ export function chatImages(max = 40) {
     return out;
 }
 
-// ───────────── покупки: витрина от умной модели, оплата — банк Телефона ─────────────
+// ───────────── покупки: витрина от умной модели, оплата — счёт «за дом» в Life (LifeMoney, Life 0.71+) или банк Телефона ─────────────
 
+const LM = () => { try { return globalThis.LifeMoney?.ready?.() ? globalThis.LifeMoney : null; } catch { return null; } };
 let bankMod = null;
 export async function bank() {
     if (bankMod !== null) return bankMod;
     try { const b = await import('/scripts/extensions/third-party/Phone-ST/bank.js'); bankMod = typeof b.getBank === 'function' ? b : false; } catch { bankMod = false; }
     return bankMod;
 }
-export function balance() { if (!bankMod) return null; try { const bk = bankMod.getBank(); return { v: num(bk.balance), text: bankMod.fmtMoney(bk.balance) }; } catch { return null; } }
-export function money(n) { try { return bankMod?.fmtMoney ? bankMod.fmtMoney(n) : `$${Math.round(n).toLocaleString('ru-RU')}`; } catch { return `$${n}`; } }
+export function balance() { const lm = LM(); if (lm) { try { const b = lm.balance(lm.defaultPayer('dom')); if (b) return { v: b.v, text: `${b.text} · ${b.name}`, life: true }; } catch { /* */ } } if (!bankMod) return null; try { const bk = bankMod.getBank(); return { v: num(bk.balance), text: bankMod.fmtMoney(bk.balance) }; } catch { return null; } }
+export function money(n) { try { const lm = LM(); if (lm) return lm.fmt(n); return bankMod?.fmtMoney ? bankMod.fmtMoney(n) : `$${Math.round(n).toLocaleString('ru-RU')}`; } catch { return `$${n}`; } }
 export const priceNum = (p) => { const s = String(p ?? '').replace(/\s/g, '').replace(',', '.'); const m = s.match(/-?\d+(\.\d+)?/); return m ? Math.round(Number(m[0])) : 0; };
 async function pay(amount, label) {
+    const lm = LM();
+    if (lm && amount > 0) { const r = await lm.pay({ acc: lm.defaultPayer('dom'), amount, label: cut(label, 80), category: 'дом', src: 'dom' }); return r.ok ? { ok: true, name: r.name } : { ok: false, why: r.why || 'не вышло' }; }
     const b = await bank();
     if (!b || !(amount > 0)) return { ok: false, why: b ? '' : 'банк Телефона не найден — без списания' };
     try {
@@ -612,7 +615,7 @@ export async function buy(x) {
     if (price > 0) {
         const r = await pay(price, `Дом: ${x.name}`);
         if (!r.ok && r.why && !/не найден/.test(r.why)) throw new Error(r.why);
-        paid = r.ok ? `−${money(price)}` : r.why;
+        paid = r.ok ? `−${money(price)}${r.name ? ` · ${r.name}` : ''}` : r.why;
     }
     const it = addItem(kind, { ...x, price }, { src: 'shop' });
     const list = shopList(x.cat); const k = list.indexOf(x); if (k >= 0) list.splice(k, 1);
