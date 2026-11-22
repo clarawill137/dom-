@@ -11,7 +11,7 @@ export function setApi(a) { A = a; }
 
 const ctx = () => SillyTavern.getContext();
 export const MODULE = 'dom';
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 // ───────────── мелочи ─────────────
 
@@ -67,7 +67,7 @@ export function M() {
     if (!md.dom || typeof md.dom !== 'object') md.dom = blank();
     const m = md.dom;
     for (const k of ['gen', 'items', 'shots', 'sugg']) if (!Array.isArray(m[k])) m[k] = [];
-    for (const k of ['rooms', 'shop', 'nursery']) if (!m[k] || typeof m[k] !== 'object' || Array.isArray(m[k])) m[k] = {};
+    for (const k of ['rooms', 'shop', 'nursery', 'doll']) if (!m[k] || typeof m[k] !== 'object' || Array.isArray(m[k])) m[k] = {};
     return m;
 }
 export const hasChat = () => { try { return A?.hasChat ? A.hasChat() : !!ctx().chatMetadata; } catch { return false; } };
@@ -349,7 +349,7 @@ export async function roomLore(room) {
 }
 export const roomImg = (id) => M().rooms[`${id}:${eraKey()}`]?.img || '';
 /** Нарисовать комнату. withItems — перерисовать её же, добавив расставленные вещи (их картинки — рефами). */
-export async function drawRoom(room, { withItems = false } = {}) {
+export async function drawRoom(room, { withItems = false, doll = '' } = {}) {
     if (!A?.drawPicture) throw new Error('Рисую через Life и Гардероб, а их нет');
     const y = storyYear();
     const lore = await roomLore(room);
@@ -357,7 +357,7 @@ export async function drawRoom(room, { withItems = false } = {}) {
     const lines = [];
     let roomRef = false;
     if (withItems) {
-        const cur = roomImg(room.id);
+        const cur = doll ? '' : roomImg(room.id);
         if (cur) { const r = await refData(cur, 1280); if (r) { refs.push(r); roomRef = true; } }
         const placed = placedIn(room.id);
         for (const it of placed.slice(0, 6)) {
@@ -367,11 +367,11 @@ export async function drawRoom(room, { withItems = false } = {}) {
             else lines.push(`${it.name}${it.desc ? ` — ${cut(it.desc, 80)}` : ''}${where}`);
         }
     }
-    if (withItems && !lines.length) throw new Error('В комнате пока ничего не стоит — поставь вещи');
+    if (withItems && !lines.length && !doll) throw new Error('В комнате пока ничего не стоит — поставь вещи');
     const keep = withItems && roomRef;
     const base = keep
         ? `Keep this room exactly as in reference 1 (same layout, light and style) and add these things, each in its place (the spot is in Russian): ${lines.join('; ')}.`
-        : `Interior: ${room.en} in the home of Hedy and Bucky (${y < 1950 ? 'the 1940s, period-accurate' : `present day, ${y}`}).${lore ? `\nDetails from the story (keep them): ${lore}` : ''}${lines.length ? `\nInclude these things, each in its place (the spot is in Russian): ${lines.join('; ')}.` : ''}`;
+        : `Interior: ${room.en} in the home of Hedy and Bucky (${y < 1950 ? 'the 1940s, period-accurate' : `present day, ${y}`}).${lore ? `\nDetails from the story (keep them): ${lore}` : ''}${doll ? `\nArrange the room exactly like this (the plan is in Russian; "left wall" and "right wall" are the two walls we see): ${doll}.` : ''}${lines.length ? `\nInclude these things, each in its place (the spot is in Russian): ${lines.join('; ')}.` : ''}`;
     const prompt = `${base}
 Lived-in and cosy, warm light, small personal touches; no people, no text.
 Style: ${artStyle()}. Wide composition.`;

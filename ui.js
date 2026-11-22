@@ -3,6 +3,7 @@
 
 import * as C from './core.js';
 import * as D from './data.js';
+import * as Doll from './doll.js';
 
 const esc = C.esc;
 const ui = {
@@ -14,7 +15,7 @@ const ui = {
 // ───────────── значки ─────────────
 
 const P = {
-    x: '<path d="M6 6l12 12M18 6 6 18"/>', plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>', check: '<path d="m5 12 5 5 9-10"/>',
+    x: '<path d="M6 6l12 12M18 6 6 18"/>', cube: '<path d="M12 3 4 7.5v9L12 21l8-4.5v-9Z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/>', image: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/>', plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>', check: '<path d="m5 12 5 5 9-10"/>',
     back: '<path d="M15 5 8 12l7 7"/>', heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/>',
     brush: '<path d="M14 4l6 6-8 8H6v-6Z"/><path d="M4 20c1-3 2-4 4-4"/>', upload: '<path d="M12 15V4M7 9l5-5 5 5M4 20h16"/>',
     pause: '<path d="M8 5v14M16 5v14"/>', play: '<path d="M7 5l12 7-12 7Z"/>', sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7Z"/>',
@@ -113,6 +114,7 @@ function render(fresh = false) {
     try { html = room ? roomHtml(room) : homeHtml(); } catch (err) { console.error('[Дом] экран', err); html = `<div class="dm-empty">Экран упал: ${esc(err?.message || err)}</div>`; }
     body.innerHTML = html;
     body.scrollTop = top;
+    if (room && Doll.mode(room.id) === 'doll') { try { Doll.mount(body); } catch (err) { console.warn('[Дом] домик', err); } }
 }
 function go(view, room = '') { ui.view = view; ui.room = room; render(true); }
 
@@ -163,13 +165,17 @@ function roomHtml(r) {
             <label class="dm-btn sm glass" title="Своя картинка">${ic('upload')}<input type="file" accept="image/*" data-dmup="room" data-id="${r.id}" hidden></label>
         </div>
     </div>`;
+    const mode = Doll.mode(r.id);
+    const tabs = `<div class="dm-modes">${[['doll', 'cube', 'Домик'], ['pic', 'image', 'Картинка']].map(([v, i, l]) => `<button class="${mode === v ? 'on' : ''}" data-dm="dlMode" data-room="${r.id}" data-v="${v}">${ic(i)}<span>${l}</span></button>`).join('')}</div>`;
+    let view = pic;
+    if (mode === 'doll') { try { view = Doll.sceneHtml(r) + Doll.barHtml(r); } catch (err) { console.error('[Дом] домик', err); view = `<div class="dm-empty">Домик упал: ${esc(err?.message || err)}</div>${pic}`; } }
     if (r.link) {
         const [, hall] = r.link.split(':');
         const txt = { lab: 'Лаборатория Хеди — это лаба Ангара: проекты, полигон, кубик инсайтов, кладбище прототипов.', spar: 'Тренировочный зал — спарринг в Ангаре: Баки учит Хеди, кубик, синяки, навыки растут и уходят в досье квартирмейстера.', gar: 'Гараж — в Ангаре: «Додж» баклажанового цвета, мотоцикл, бак, урон, номера.' }[hall];
-        return `${pic}<div class="dm-card bridge"><p>${esc(txt)}</p>${btn('angar', `${ic(r.ico)} Открыть: ${esc(LINK_WORD[r.link])}`, attr({ v: hall }), 'primary wide')}</div>`;
+        return `${tabs}${view}<div class="dm-card bridge"><p>${esc(txt)}</p>${btn('angar', `${ic(r.ico)} Открыть: ${esc(LINK_WORD[r.link])}`, attr({ v: hall }), 'primary wide')}</div>`;
     }
     const shelves = (r.shelves || []).filter(k2 => k2 !== 'hc');
-    return `${pic}
+    return `${tabs}${view}
         ${r.id === 'kitchen' ? fridgeHtml() : ''}
         ${sec('Что тут стоит', placed.length ? String(placed.length) : 'пусто')}
         ${placed.length ? `<div class="dm-things">${placed.map(thing).join('')}</div>` : '<div class="dm-hint">Купи, придумай или перенеси сюда вещь — появится тут. С картинками вещей комнату можно перерисовать «С вещами».</div>'}
@@ -223,7 +229,7 @@ function paintModal() {
     if (!ui.modal) { box.classList.remove('on'); box.innerHTML = ''; return; }
     const top = box.querySelector('.dm-sheet')?.scrollTop || 0;
     let html = '';
-    try { html = { gen: genSheet, hc: hcSheet, zoom: zoomSheet, shelf: shelfSheet, item: itemSheet, shop: shopSheet, inv: invSheet, sugg: suggSheet, place: placeSheet, form: formSheet, pick: pickSheet }[ui.modal.kind]?.() || ''; } catch (err) { console.error('[Дом] лист', err); html = `<div class="dm-sheet">${sheetHead('Ой')}<div class="dm-empty">${esc(err?.message || err)}</div></div>`; }
+    try { html = { gen: genSheet, hc: hcSheet, zoom: zoomSheet, shelf: shelfSheet, item: itemSheet, shop: shopSheet, inv: invSheet, sugg: suggSheet, place: placeSheet, form: formSheet, pick: pickSheet, dlWall: () => Doll.wallSheet(sheetHead), dlFloor: () => Doll.floorSheet(sheetHead), dlFurn: () => Doll.furnSheet(sheetHead) }[ui.modal.kind]?.() || ''; } catch (err) { console.error('[Дом] лист', err); html = `<div class="dm-sheet">${sheetHead('Ой')}<div class="dm-empty">${esc(err?.message || err)}</div></div>`; }
     box.innerHTML = html;
     box.classList.add('on');
     const s = box.querySelector('.dm-sheet'); if (s) s.scrollTop = top;
@@ -631,6 +637,9 @@ const HANDLERS = {
     formSave: async () => { const f = ui.modal; const r = await f.onSave(formVals()); if (r === false) { C.toast('info', 'Заполни главное'); return; } if (r !== 'keep' && ui.modal === f) closeModal(); else render(); },
 };
 
+Object.assign(HANDLERS, Doll.handlers({ render: () => render(), modal, closeModal, paintModal: () => paintModal(), withBusy }));
+Doll.bind({ render: () => render(), modal, closeModal, paintModal: () => paintModal(), withBusy, busy: (k) => ui.busy.has(k) });
+
 export function onClick(e) {
     const el = e.target.closest?.('[data-dm]');
     if (!el || !el.closest('#dm-app')) return;
@@ -641,12 +650,14 @@ export function onClick(e) {
 export function onChange(e) {
     const el = e.target;
     if (!el?.closest?.('#dm-app')) return;
+    if (el.dataset?.dmup === 'dltex') { Doll.uploadTex(el); return; }
     if (el.dataset?.dmup) { upload(el); return; }
     const f = el.dataset?.dmf;
     if (!f) return;
     if (f === 'gen:ask') ui.gen.ask = el.value;
     else if (f === 'shop:ask') ui.shop.ask = el.value;
     else if (f === 'shelf:ask') ui.shelf.ask = el.value;
+    else if (f.startsWith('dl:')) Doll.onField(f, el.value);
     else if (f === 'cfg:autoDraw') { C.cfg().autoDraw = !!el.checked; C.saveCfg(); }
     else if (f.startsWith('it:')) {
         const it = C.itemById(el.dataset.id); if (!it) return;
@@ -665,6 +676,7 @@ export function onInput(e) {
     if (f === 'gen:ask') ui.gen.ask = e.target.value;
     if (f === 'shop:ask') ui.shop.ask = e.target.value;
     if (f === 'shelf:ask') ui.shelf.ask = e.target.value;
+    if (f?.startsWith?.('dl:')) Doll.onField(f, e.target.value);
 }
 async function upload(el) {
     const file = el.files?.[0];

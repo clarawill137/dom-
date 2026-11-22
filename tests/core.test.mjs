@@ -186,4 +186,92 @@ assert.match(C.promptNote('normal'), /имена для дочки в шорт-�
 const pt = C.addItem('plant', { name: 'Базилик' }); pt.planted = '2024-10-01';
 assert.equal(C.plantStage(pt), 3, 'посажен в октябре — взрослый к 21 ноября');
 
+// 17. кукольный домик: раскладка по лору, проекция туда-обратно, поворот, наклейки встают на мебель
+{
+    const Dl = await import('../doll.js');
+    const Kd = await import('../dolldata.js');
+    const s = Dl.roomState('living');
+    assert.ok(s.furn.length >= 8 && s.wl === 'brick' && s.fl === 'herring', 'гостиная — по лору');
+    const [sx, sy] = Dl.P(3.2, 4.1, 0);
+    const [x, y] = Dl.unP(sx, sy, 0);
+    assert.ok(Math.abs(x - 3.2) < 1e-6 && Math.abs(y - 4.1) < 1e-6, 'пол туда-обратно');
+    const [ex, ez] = Dl.unWallR(...Dl.P(6, 0, 2.5));
+    assert.ok(Math.abs(ex - 6) < 1e-6 && Math.abs(ez - 2.5) < 1e-6, 'правая стена туда-обратно');
+    const [ey, ez2] = Dl.unWallL(...Dl.P(0, 7, 1.5));
+    assert.ok(Math.abs(ey - 7) < 1e-6 && Math.abs(ez2 - 1.5) < 1e-6, 'левая стена туда-обратно');
+    // поворот держит предмет в комнате и меняет след
+    const sofa = s.furn.find(p => p.t === 'sofa');
+    assert.deepEqual(Dl.footprint(sofa), [2, 4.5]);
+    Dl.rotatePiece(s, sofa);
+    assert.deepEqual(Dl.footprint(sofa), [4.5, 2]);
+    assert.ok(sofa.x >= 0 && sofa.x + 4.5 <= 10 && sofa.y >= 0 && sofa.y + 2 <= 10);
+    // спинка дивана после поворота на 1 — у левой стены (x=0 у коробки спинки)
+    const b1 = Dl.boxesOf({ t: 'sofa', x: 0, y: 0, r: 1 })[0];
+    assert.equal(b1[0], 0, 'r=1 — спинкой к левой стене');
+    // порядок коробок: подушка — после сиденья
+    const ord = Dl.orderBoxes(Kd.FURN.sofa.parts);
+    assert.ok(ord.indexOf(Kd.FURN.sofa.parts[3]) < ord.indexOf(Kd.FURN.sofa.parts[4]));
+    // книга «на полке» садится на настенную полку, фото — плоско на стену, растение на крыше — в грядку
+    const book = C.addItem('book', { name: 'Полярники', room: 'living', spot: 'shelf' });
+    const photo = C.addItem('photo', { name: 'Свадьба', room: 'living', spot: 'wall' });
+    const taken = [];
+    const pb = Dl.autoPlace(book, s, taken);
+    const shelf = s.furn.find(p => p.t === 'wshelf');
+    assert.equal(pb.on, shelf.id, 'книга на полке');
+    assert.ok(Math.abs(pb.z - Dl.surfaceOf(shelf).z) < 1e-9);
+    const pp = Dl.autoPlace(photo, s, taken);
+    assert.ok(pp.flat && (pp.on === 'R' || pp.on === 'L'), 'фото — на стене');
+    const roof = Dl.roomState('roof');
+    const basil = C.addItem('plant', { name: 'Базилик', room: 'roof' });
+    const pl = Dl.autoPlace(basil, roof, []);
+    assert.equal(roof.furn.find(p => p.id === pl.on)?.t, 'planter', 'растение — в грядке');
+    // вещь ставится на стол под пальцем, а мимо мебели — на пол
+    const table = s.furn.find(p => p.t === 'ctable');
+    const sf = Dl.surfaceOf(table);
+    const cx = (sf.x0 + sf.x1) / 2, cy = (sf.y0 + sf.y1) / 2;
+    const hit = Dl.hitUp(...Dl.P(cx, cy, sf.z), [sf]);
+    assert.equal(hit.on, table.id);
+    assert.ok(Math.abs(hit.x - cx) < 1e-6 && Math.abs(hit.z - sf.z) < 1e-9);
+    assert.equal(Dl.hitUp(...Dl.P(9, 9, 0), [sf]).on, 'F');
+    assert.equal(Dl.hitFlat(...Dl.P(5, 0, 3)).on, 'R');
+    assert.equal(Dl.hitFlat(...Dl.P(0, 5, 3)).on, 'L');
+    // двигаешь стол — вещь на нём едет вместе
+    Dl._test.setCur({ id: 'living', s, items: [book], surf: [] });
+    book.doll = { on: table.id, x: cx, y: cy, z: sf.z, s: 1 };
+    Dl.commitFurn(table, { x: table.x + 1, y: table.y });
+    assert.ok(Math.abs(book.doll.x - (cx + 1)) < 1e-6, 'вещь едет с мебелью');
+    // обои на одну стену не трогают другую; «обе» — снова одинаковые
+    Dl.applyWall(s, 'L', 'mint');
+    assert.equal(s.wl, 'mint'); assert.equal(s.wr, 'brick');
+    Dl.applyWall(s, 'both', 'rose');
+    assert.equal(s.wl, 'rose'); assert.equal(s.wr, '');
+    // детская: пока кроватку не собрали — коробки; собрали — кроватка
+    delete C.M().nursery.crib; delete C.M().doll[Dl.dollKey('nursery')];
+    const nur = Dl.roomState('nursery');
+    assert.ok(nur.furn.some(p => p.t === 'boxes') && !nur.furn.some(p => p.t === 'crib'));
+    C.cribRoll();
+    assert.ok(Dl.roomState('nursery').furn.some(p => p.t === 'crib'), 'кроватку собрали');
+    // вырезать фон: однотонный фон уходит, предмет остаётся и обрезается по краям
+    const w = 20, h = 20, px = new Uint8ClampedArray(w * h * 4);
+    for (let i = 0; i < w * h; i++) { const X = i % w, Y = (i / w) | 0; const obj = X >= 6 && X < 14 && Y >= 4 && Y < 18; px.set(obj ? [180, 40, 60, 255] : [240, 232, 220, 255], i * 4); }
+    const cut = Dl.floodCut(px, w, h);
+    assert.deepEqual(cut.bbox, [6, 4, 13, 17]);
+    assert.equal(px[3], 0, 'угол прозрачный');
+    assert.equal(px[(10 * w + 10) * 4 + 3], 255, 'середина предмета целая');
+    assert.ok(cut.removed > 0.6 && cut.removed < 0.8);
+    // свет по времени, погода
+    assert.equal(Dl.phaseOf('23:40'), 'night'); assert.equal(Dl.phaseOf('18:10'), 'evening'); assert.equal(Dl.phaseOf('07:00'), 'dawn'); assert.equal(Dl.phaseOf(''), 'day');
+    assert.equal(Dl.wxOf('за окном валит снег'), 'snow'); assert.equal(Dl.wxOf('ясно, без дождя'), '');
+    // словами для «Картинкой»
+    assert.match(Dl.describe('living'), /стены — Розовая полоска; пол — Ёлочка; мебель: .*диван/);
+    // сброс — заново по лору
+    Dl.resetRoom('living');
+    assert.equal(Dl.roomState('living').wl, 'brick');
+    // сцена собирается в HTML без падений, порядок отрисовки — сначала дальнее
+    const html = Dl.sceneHtml(D.roomById('kitchen'));
+    assert.match(html, /dl-scene ph-night|dl-scene ph-dusk/);
+    assert.ok((html.match(/class="dl-fu/g) || []).length >= 10);
+    for (const t of Object.keys(Kd.FURN)) assert.ok(Dl.thumbSvg(t).startsWith('<svg'), t);
+}
+
 console.log('дом · логика: все проверки прошли');
