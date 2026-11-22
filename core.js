@@ -11,7 +11,7 @@ export function setApi(a) { A = a; }
 
 const ctx = () => SillyTavern.getContext();
 export const MODULE = 'dom';
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 
 // ───────────── мелочи ─────────────
 
@@ -177,10 +177,16 @@ export function hiddenPlans() {
             .map(x => `${short(x.who)}: ${[str(x.when), str(x.t)].filter(Boolean).join(' — ')}`).slice(0, 12);
     } catch { return []; }
 }
-let planMemo = { at: 0, v: { titles: [], re: null } };
+/** Записи книги, которые видно из этой эпохи (ядро «Священный таймлайн»: книги чужих эпох и будущее по дате — мимо). */
+async function seen(book, data) {
+    const list = Object.values(data?.entries || {});
+    try { const v = window.SacredTimeline?.visible; return typeof v === 'function' ? await v(list, book) : list; } catch { return list; }
+}
+const eraTag = () => { try { const x = window.SacredTimeline?.context?.(); return `${x?.era?.id || ''}|${x?.date || ''}`; } catch { return ''; } };
+let planMemo = { at: 0, era: '', v: { titles: [], re: null } };
 /** Записи лорбуков «Задел: …» — их ключи (плейстейшн, приставк, видеоигр…) не пускают хэд на холодильник. */
 export async function planKeys() {
-    if (Date.now() - planMemo.at < 60000) return planMemo.v;
+    if (Date.now() - planMemo.at < 60000 && planMemo.era === eraTag()) return planMemo.v;
     const titles = [];
     const keys = [];
     try {
@@ -188,17 +194,17 @@ export async function planKeys() {
         for (const b of [...(wi.world_names || [])]) {
             let data = null;
             try { data = await (ctx().loadWorldInfo ? ctx().loadWorldInfo(b) : wi.loadWorldInfo(b)); } catch { continue; }
-            for (const e of Object.values(data?.entries || {})) {
+            for (const e of await seen(b, data)) {
                 if (!e || e.disable || !/задел/i.test(String(e.comment || ''))) continue;
                 titles.push(cut(str(e.comment), 80));
                 for (const k of arr(e.key)) { const s = str(k).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); if (s.length >= 3) keys.push(s); }
             }
         }
     } catch { /* без лорбуков */ }
-    planMemo = { at: Date.now(), v: { titles: titles.slice(0, 12), re: keys.length ? new RegExp(keys.join('|'), 'i') : null } };
+    planMemo = { at: Date.now(), era: eraTag(), v: { titles: titles.slice(0, 12), re: keys.length ? new RegExp(keys.join('|'), 'i') : null } };
     return planMemo.v;
 }
-export function _setPlanKeys(v) { planMemo = { at: Date.now(), v }; }
+export function _setPlanKeys(v) { planMemo = { at: Date.now(), era: eraTag(), v }; }
 
 // ───────────── умная модель ─────────────
 
@@ -335,7 +341,8 @@ export async function roomLore(room) {
             if (!/apartment|квартир|дом(?![а-яё])|house|home/i.test(b)) continue;
             let data = null;
             try { data = await (ctx().loadWorldInfo ? ctx().loadWorldInfo(b) : wi.loadWorldInfo(b)); } catch { continue; }
-            for (const e of Object.values(data?.entries || {})) {
+            // квартира 2024-го не рисуется в комнатах сороковых: книги чужих эпох ядро отрезает
+            for (const e of await seen(b, data)) {
                 if (!e || e.disable || !str(e.content)) continue;
                 if (!room.re.test(`${e.comment || ''} ${arr(e.key).join(' ')}`)) continue;
                 const t = cut(plain(e.content), 600);
