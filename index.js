@@ -5,6 +5,7 @@
 import * as C from './core.js';
 import * as D from './data.js';
 import * as U from './ui.js';
+import './wave.js';
 
 const ID = 'dom';
 let api = null;
@@ -51,8 +52,9 @@ function settingsDrawer() {
             <label class="checkbox_label"><input type="checkbox" data-dmc="autoDraw" ${s.autoDraw ? 'checked' : ''}> Хэды и вещи рисуются сразу</label>
             <label class="checkbox_label"><input type="checkbox" data-dmc="chron" ${s.chron ? 'checked' : ''}> Летописец замечает новое в доме, записки и хорошие моменты</label>
             <label>Уютные детали модели <select data-dmc="prompt">${opt('auto', s.prompt, 'когда сцена дома')}${opt('always', s.prompt, 'всегда')}${opt('off', s.prompt, 'выкл')}</select></label>
+            <label>Сезонный декор <select data-dmc="season">${opt('auto', s.season, 'сам, по дате истории')}${opt('off', s.season, 'выкл')}</select></label>
             <label>Хэд-машина <select data-dmc="model">${opt('deep', s.model, 'умная модель Life (со сводом)')}${opt('chron', s.model, 'модель Летописца')}</select></label>
-            <small>Палочка → «Дом», команда <code>/dom</code> (<code>/dom hc</code> — сразу хэд-машина). Нужен Life; картинки — через Гардероб.</small>
+            <small>Палочка → «Дом», команда <code>/dom</code> (<code>/dom hc</code> — сразу хэд-машина). Нужен Life; картинки — через Гардероб. Дом свой у каждой эпохи (ядро «Священный таймлайн»): палатка 1943-го, Адская кухня, Бруклин, трейлер и «Скиталец», квартира с Наташей, дом над лавкой Марко.</small>
             <div class="menu_button" id="dm_open" style="margin-top:6px">Открыть</div>
         </div>
     </div>`);
@@ -87,7 +89,7 @@ function registerSlash() {
 globalThis.Dom = {
     version: C.VERSION, open: (room) => U.open(room || null), openGen: () => U.open(null, true),
     // соседям (Зёрнышко): вещь в дом — например, купленное приданое встаёт в Детскую; имена малыша — общая доска
-    add: (kind, x = {}) => { const k = D.KINDS[kind] ? kind : 'decor'; const it = C.addItem(k, { ...x }, { src: 'zr', room: x.room || D.KINDS[k].room || '' }); if (it.room && !it.spot) it.spot = D.DEFAULT_SPOT?.[k] || 'shelf'; C.touch(); try { U.renderSoon(); } catch { /* */ } return it.id; },
+    add: (kind, x = {}) => { const k = D.KINDS[kind] ? kind : 'decor'; const it = C.addItem(k, { ...x }, { src: 'zr', room: D.roomById(x.room) ? x.room : D.roomFor(k) }); if (it.room && !it.spot) it.spot = D.DEFAULT_SPOT?.[k] || 'shelf'; C.touch(); try { U.renderSoon(); } catch { /* */ } return it.id; },
     names: () => C.itemsOf('name').map(x => ({ id: x.id, name: x.name, meaning: x.meaning || x.desc || '', votes: { ...(x.votes || {}) } })),
     addName: (x = {}) => { const it = C.addItem('name', { name: String(x.name || '').trim(), meaning: x.meaning || '' }, { src: 'zr' }); C.touch(); try { U.renderSoon(); } catch { /* */ } return it.id; },
     vote: (id, who, v) => { C.vote(id, who, v); try { U.renderSoon(); } catch { /* */ } },

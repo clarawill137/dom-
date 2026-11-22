@@ -4,6 +4,7 @@
 // в комнате — кто сейчас в сцене. «Картинкой» — ИИ рисует комнату такой, как её расставили.
 
 import * as C from './core.js';
+import * as Season from './season.js';
 import * as D from './data.js';
 import * as K from './dolldata.js';
 
@@ -49,11 +50,12 @@ export function roomState(id) {
     if (!s || typeof s !== 'object') s = m.doll[key] = {};
     if (!Array.isArray(s.furn)) seed(id, s);
     if (id === 'nursery' && C.M().nursery?.crib) for (const p of s.furn) if (p.t === 'boxes') p.t = 'crib';
+    try { Season.applyDecor(id, s, addPiece); } catch (e) { console.warn('[Дом] сезонный декор', e); }
     return s;
 }
 function seed(id, s) {
     const L = K.LAYOUT[id] || { wall: 'cream', floor: 'planks', furn: [] };
-    s.wl = s.wl || L.wall; s.wr = s.wr || ''; s.fl = s.fl || L.floor;
+    s.wl = s.wl || L.wall; s.wr = s.wr || L.wallR || ''; s.fl = s.fl || L.floor;
     s.furn = L.furn.map(f => mkPiece(f, id)).filter(Boolean);
 }
 function mkPiece(f, roomId) {
@@ -213,12 +215,14 @@ function polysOf(p, proj, { ph = 'day', wx = '', uid = 'x' } = {}) {
         const f = faces(bx, proj);
         grow(f.rx); grow(f.ry); grow(f.top);
         const tok = bx[6];
-        if (tok === 'sky') {
-            const [top, low] = K.SKY[ph] || K.SKY.day;
+        if (tok === 'sky' || tok === 'space') {
+            // космос за иллюминатором — всегда ночь и звёзды, без погоды
+            const space = tok === 'space';
+            const [top, low] = space ? ['#03050d', '#141b36'] : (K.SKY[ph] || K.SKY.day);
             const gid = `sk${uid}`;
             if (!defs.includes(gid)) {
                 defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${low}"/></linearGradient>`;
-                const pat = wx === 'snow' ? 'snow' : wx === 'rain' ? 'rain' : ph === 'night' ? 'stars' : '';
+                const pat = space ? 'stars' : wx === 'snow' ? 'snow' : wx === 'rain' ? 'rain' : ph === 'night' ? 'stars' : '';
                 if (pat) defs += `<pattern id="wx${uid}" width="${pat === 'stars' ? 11 : 7}" height="${pat === 'stars' ? 9 : 7}" patternUnits="userSpaceOnUse">${WXPAT[pat]}</pattern>`;
             }
             const front = p.wall === 'L' ? f.rx : f.ry;
@@ -935,7 +939,11 @@ export function barHtml(room) {
 
 // ───────────── листы ─────────────
 
-const ROOM_CATS = { kitchen: ['kitchen', 'table', 'seat', 'wall', 'light', 'decor'], living: ['seat', 'table', 'store', 'decor', 'light', 'wall', 'garden'], bedroom: ['sleep', 'store', 'seat', 'light', 'decor', 'wall'], nursery: ['kids', 'seat', 'store', 'light', 'decor', 'wall'], roof: ['garden', 'seat', 'table', 'light', 'decor'], gym: ['gym', 'seat', 'wall', 'light'], lab: ['lab', 'table', 'store', 'wall', 'light'], garage: ['garage', 'lab', 'wall', 'light'], shop: ['shop', 'table', 'store', 'wall', 'decor'] };
+const ROOM_CATS = { tent: ['camp', 'season', 'light', 'seat', 'store', 'wall', 'decor'], workshop40: ['camp', 'lab', 'table', 'wall'], depot40: ['camp', 'store', 'wall'],
+    hk_room: ['cheap', 'seat', 'table', 'kitchen', 'light', 'decor', 'wall', 'season'], bk_kitchen: ['kitchen', 'table', 'seat', 'store', 'light', 'wall', 'season'], bk_room: ['seat', 'sleep', 'table', 'store', 'light', 'decor', 'wall', 'season'], bk_fire: ['garden', 'seat', 'decor', 'wall'],
+    trailer: ['camp', 'cheap', 'table', 'light', 'decor', 'wall', 'season'], barn: ['ship', 'lab', 'garage', 'wall', 'light'], cabin: ['ship', 'sleep', 'seat', 'store', 'decor', 'wall', 'season'], galley: ['ship', 'kitchen', 'table', 'seat', 'wall', 'season'], sbridge: ['ship', 'seat', 'wall'], hold: ['ship', 'store', 'wall'], slab: ['ship', 'lab', 'table', 'wall'],
+    n_kitchen: ['kitchen', 'table', 'seat', 'wall', 'light', 'decor', 'season'], n_living: ['seat', 'table', 'store', 'decor', 'light', 'wall', 'season'], n_hedy: ['sleep', 'store', 'table', 'light', 'decor', 'wall'], n_nat: ['sleep', 'store', 'seat', 'light', 'decor', 'wall'],
+    kitchen: ['kitchen', 'table', 'seat', 'wall', 'light', 'decor'], living: ['seat', 'table', 'store', 'decor', 'light', 'wall', 'garden'], bedroom: ['sleep', 'store', 'seat', 'light', 'decor', 'wall'], nursery: ['kids', 'seat', 'store', 'light', 'decor', 'wall'], roof: ['garden', 'seat', 'table', 'light', 'decor'], gym: ['gym', 'seat', 'wall', 'light'], lab: ['lab', 'table', 'store', 'wall', 'light'], garage: ['garage', 'lab', 'wall', 'light'], shop: ['shop', 'table', 'store', 'wall', 'decor'] };
 export function wallSheet(head) {
     const s = roomState(cur?.id || 'kitchen');
     const ph = phaseNow();

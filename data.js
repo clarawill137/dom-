@@ -1,39 +1,31 @@
-// ✦ Дом — данные: дом по этажам (по лору: довоенный кирпичный дом на Манхэттене, внизу лавка Марко, 2 этаж — жилой,
-// 3 — тренировочный зал, 4 — лаборатория), полки уюта, настроения хэдов, покупки.
+// ✦ Дом — данные: полки уюта, настроения хэдов, покупки. Этажи и комнаты — свои у каждой эпохи (homes.js).
 
-/** Этажи сверху вниз. n — номер на табличке. */
-export const FLOORS = [
-    { id: 'roof', n: '', name: 'Крыша', short: 'крыша', rooms: ['roof'] },
-    { id: 'f4', n: '4', name: 'Лаборатория Хеди', short: 'лаба', rooms: ['lab'] },
-    { id: 'f3', n: '3', name: 'Тренировочный зал', short: 'зал', rooms: ['gym'] },
-    { id: 'f2', n: '2', name: 'Квартира', short: 'квартира', rooms: ['kitchen', 'living', 'bedroom', 'nursery'] },
-    { id: 'f1', n: '1', name: 'Лавка Марко', short: 'лавка', rooms: ['shop'] },
-    { id: 'yard', n: '', name: 'Двор', short: 'двор', rooms: ['garage'] },
-];
+import * as H from './homes.js';
 
-/** Комнаты. shelves — полки уюта в комнате; link — комната ведёт в соседнее расширение (мостик). */
-export const ROOMS = [
-    { id: 'kitchen', name: 'Кухня', ico: 'cup', re: /кухн|столов|kitchen|dining/i, shelves: ['hc', 'note', 'recipe', 'joy'],
-        en: 'kitchen in a pre-war Manhattan apartment: exposed red brick, a big retro fridge covered in photos and magnets, a framed photo of an old-fashioned 1930s woman on the wall, Christmas lights' },
-    { id: 'living', name: 'Гостиная', ico: 'sofa', re: /гостин|зал(?![а-яё])|living|лаунж|диван/i, shelves: ['book', 'plush', 'card', 'catch', 'date', 'song', 'hobby', 'diary'],
-        en: 'living room in a pre-war Manhattan apartment: exposed red brick, a deep sofa with a merino throw, bookshelves, a record player, a cat bed, warm lamps, snow behind tall windows' },
-    { id: 'bedroom', name: 'Спальня', ico: 'bed', re: /спальн|bedroom/i, shelves: [],
-        en: 'cosy bedroom: brick wall, big bed with soft linen, a reading lamp, a leather jacket on a chair' },
-    { id: 'nursery', name: 'Детская', ico: 'baby', re: /детск|nursery/i, shelves: ['nursery', 'name'],
-        en: 'a nursery being prepared for a baby girl: soft light, a crib, a rocking chair, brick wall painted in a gentle colour' },
-    { id: 'gym', name: 'Тренировочный зал', ico: 'dumbbell', re: /тренировочн|спортзал|зал для|тренаж|gym/i, link: 'angar:spar',
-        en: 'a private training hall on the third floor: red brick walls, mats, punching bags, a pull-up bar, weights, tall arched windows' },
-    { id: 'lab', name: 'Лаборатория', ico: 'flask', re: /лаборатор|мастерск|workshop|lab/i, link: 'angar:lab',
-        en: "a genius inventor's laboratory on the fourth floor: workbenches, holographic screens, half-built gadgets, a small round helper robot, brick walls" },
-    { id: 'roof', name: 'Крыша', ico: 'leaf', re: /крыш|терраса|огород|roof/i, shelves: ['plant'],
-        en: 'a small rooftop garden on a pre-war Manhattan building: planters, a tiny greenhouse, string lights, the city skyline' },
-    { id: 'shop', name: 'Лавка Марко', ico: 'store', re: /лавк|марко|бакале|магазин внизу/i, shelves: [],
-        en: "a small old Italian grocery shop on the ground floor: cheeses, bread, jars, an old radio playing Italian songs, warm light" },
-    { id: 'garage', name: 'Гараж', ico: 'car', re: /гараж|garage/i, link: 'angar:gar',
-        en: 'a garage with a muscle car in deep eggplant colour and a motorcycle, tools on the wall' },
-];
-export const roomById = (id) => ROOMS.find(r => r.id === id) || null;
-export const floorOf = (roomId) => FLOORS.find(f => f.rooms.includes(roomId)) || null;
+// ───────────── дом этой эпохи (эпоху и место решает core: ядро «Священный таймлайн» или дата истории) ─────────────
+
+let homeOf = () => '2024';
+let siteOf = () => '';
+export function setHome(fnHome, fnSite) { homeOf = fnHome; siteOf = fnSite; }
+export const HOMES = H.HOMES;
+export const home = () => H.HOMES[homeOf()] || H.HOMES['2024'];
+/** Место внутри эпохи (2017: трейлер ↔ «Скиталец», 2018: квартира ↔ «Скиталец») или null. */
+export const site = () => { const h = home(); return h.sites ? (h.sites.find(s => s.id === siteOf()) || h.sites[0]) : null; };
+/** Все комнаты эпохи (по ним проверяются вещи) и этажи того места, где живут сейчас. */
+export const rooms = () => home().rooms;
+export const floors = () => { const s = site(); return home().floors.filter(f => !f.site || !s || f.site === s.id); };
+export const roomById = (id) => rooms().find(r => r.id === id) || null;
+export const floorOf = (roomId) => home().floors.find(f => (f.rooms || []).includes(roomId)) || null;
+export const roomsHere = () => floors().flatMap(f => (f.rooms || []).map(roomById).filter(Boolean));
+/** Комнаты, где стоят вещи (не мостики). */
+export const placeRooms = () => rooms().filter(r => !r.link);
+/** Где у этой эпохи полка вида kind: сначала там, где живут сейчас. */
+export const roomFor = (kind) => roomsHere().find(r => (r.shelves || []).includes(kind))?.id || rooms().find(r => (r.shelves || []).includes(kind))?.id || '';
+/** Что висит «на холодильнике» в этой комнате: [название, чем держится, сувениры]. */
+export const boardOf = (r) => (r?.board ? (home().board?.[r.board] || ['Холодильник', 'магниты', 'Магниты']) : null);
+/** Дом 2024-го — для совместимости. */
+export const FLOORS = H.HOMES['2024'].floors;
+export const ROOMS = H.HOMES['2024'].rooms;
 
 /** Куда в комнате: для «расставить». */
 export const SPOTS = [['shelf', 'на полке'], ['wall', 'на стене'], ['table', 'на столе'], ['window', 'на подоконнике'], ['floor', 'на полу'], ['bed', 'на кровати'], ['sofa', 'на диване'], ['fridge', 'на холодильнике']];
@@ -77,7 +69,8 @@ export const KINDS = {
         gen: 'вещи для их дома: декор, свет, текстиль, посуда, рамки — со вкусом их обоих и с историей', extra: '"price":0' },
     photo: { name: 'Фото', one: 'фото', ico: 'frame', room: null, pic: 'photo', place: true, gen: '' },
 };
-export const kindOf = (k) => KINDS[k] || KINDS.decor;
+/** Полка с поправками эпохи (в 1943-м дневник ведёт Фриц-Секач, в Бруклине «Колыбельные и песни»…). */
+export const kindOf = (k) => { const base = KINDS[k] || KINDS.decor; const o = home().kinds?.[k]; return o ? { ...base, ...o } : base; };
 /** Какие полки показываются в комнате вещей (расставляемые). */
 export const PLACE_KINDS = Object.keys(KINDS).filter(k => KINDS[k].place);
 

@@ -5,12 +5,18 @@ import * as C from './core.js';
 import * as D from './data.js';
 import * as Doll from './doll.js';
 import * as Cz from './cozy.js';
+import * as Post from './post.js';
+import * as Chores from './chores.js';
+import * as Growth from './growth.js';
+import * as Board from './board.js';
+import * as Season from './season.js';
 
 const esc = C.esc;
 const ui = {
     view: 'home', room: '', modal: null, busy: new Set(),
     gen: { who: null, vibe: 'dice', ask: '', rolling: false, flash: [], rolls: [], batch: '' },
     shop: { cat: 'decor', ask: '' }, inv: { f: 'all' }, shelf: { ask: '' }, roll: { f: 'all', sel: '', ask: '' },
+    post: { ask: '' }, chore: { who: '', help: '', ask: '' }, grow: { kid: '', cm: '', by: '', note: '' },
 };
 
 // ───────────── значки ─────────────
@@ -42,7 +48,7 @@ const P = {
     lamp: '<path d="M8 3h8l3 8H5Z"/><path d="M12 11v8M8 21h8"/>', frame: '<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="15" cy="9" r="1.5"/>',
     bag: '<path d="M5 8h14l-1 13H6Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>', box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4Z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4Z"/><path d="M10 20a2 2 0 0 0 4 0"/>', send: '<path d="M4 12 20 4l-6 16-3-7Z"/>',
-    moon: '<path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10Z"/>', calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+    moon: '<path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10Z"/>', tent: '<path d="M12 3 2 20h20Z"/><path d="M12 3v17M9 20l3-6 3 6"/>', ruler: '<rect x="8" y="2" width="8" height="20" rx="1"/><path d="M8 6h3M8 10h4M8 14h3M8 18h4"/>', star: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7Z"/>', calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
     drop: '<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11Z"/>', wand: '<path d="M4 20 15 9M14 4v3M19 9h-3M17.5 5.5l-2 2"/>', pin: '<path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11Z"/><circle cx="12" cy="10" r="2"/>',
 };
 export function ic(n, cls = '') { return `<svg class="dm-i${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || P.home}</svg>`; }
@@ -61,7 +67,15 @@ function ava(name) {
 function dieHtml(n, rolling, cls = '') {
     return `<div class="dm-die${rolling ? ' rolling' : ''} ${cls}"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 4 92 28v44L50 96 8 72V28Z"/><path d="M50 4 30 40h40Z M8 28l22 12M92 28 70 40M30 40 8 72M70 40l22 32M30 40l20 34 20-34M50 74v22"/></svg><b>${n ?? '?'}</b></div>`;
 }
-const LINK_WORD = { 'angar:lab': 'Лаба Ангара', 'angar:spar': 'Спарринг-зал Ангара', 'angar:gar': 'Гараж Ангара' };
+const LINK_WORD = { 'angar:lab': 'Лаба Ангара', 'angar:spar': 'Спарринг-зал Ангара', 'angar:gar': 'Гараж Ангара', 'angar:arm': 'Оружейная Ангара', 'artur:bridge': 'Мостик в Арте' };
+const linkName = (r) => r.linkName || LINK_WORD[r.link] || 'соседняя расширка';
+/** Мостик: Ангар (зал, лаба, гараж, оружейная) или Арт (мостик «Скитальца»). */
+function openLink(to) {
+    const [ext, where] = String(to || '').split(':');
+    if (ext === 'artur') { if (!globalThis.Artur?.open) { C.toast('info', 'А.Р.Т.У.Р. не найден — поставь его, и мостик откроется там'); return; } close(); setTimeout(() => globalThis.Artur.open(where), 220); return; }
+    if (!globalThis.Angar?.open) { C.toast('info', 'Ангар не найден — поставь его, и комната откроется там'); return; }
+    close(); setTimeout(() => globalThis.Angar.open(where), 220);
+}
 
 // ───────────── окно ─────────────
 
@@ -116,53 +130,80 @@ function render(fresh = false) {
     body.innerHTML = html;
     body.scrollTop = top;
     if (room && Doll.mode(room.id) === 'doll') { try { Doll.mount(body); } catch (err) { console.warn('[Дом] домик', err); } }
+    try { Board.mount(body); } catch (err) { console.warn('[Дом] магниты', err); }
 }
 function go(view, room = '') { ui.view = view; ui.room = room; render(true); }
 
 // ───────────── дом в разрезе ─────────────
 
 function tile(r) {
-    const img = C.roomImg(r.id);
+    const pic = Season.roomPic(r.id);
+    const img = pic.img;
     const n = r.link ? 0 : C.placedIn(r.id).length;
-    const sub = r.link ? `→ ${LINK_WORD[r.link]}` : (r.shelves || []).map(k => D.KINDS[k]?.name).filter(Boolean).slice(0, 3).join(' · ') || 'тап — зайти';
+    const sub = r.link ? `→ ${linkName(r)}` : (r.shelves || []).map(k => (k === 'hc' ? D.boardOf(r)?.[0] : D.kindOf(k).name)).filter(Boolean).slice(0, 3).join(' · ') || 'тап — зайти';
     return `<button class="dm-room${img ? ' pic' : ''}${r.link ? ' link' : ''}" data-dm="room" data-v="${r.id}">
-        <span class="dm-room-ph"${img ? ` style="background-image:url('${esc(img)}')"` : ''}>${img ? '' : ic(r.ico, 'xl')}</span>
+        <span class="dm-room-ph${pic.tint ? ` tint-${pic.tint}` : ''}"${img ? ` style="background-image:url('${esc(img)}')"` : ''}>${img ? '' : ic(r.ico, 'xl')}</span>
         <span class="dm-room-t"><b>${esc(r.name)}</b><small>${esc(sub)}</small></span>
-        ${r.id === 'kitchen' && C.hcList().length ? `<em class="dm-badge">${C.hcList().length}</em>` : n ? `<em class="dm-badge soft">${n}</em>` : ''}
+        ${r.board && C.hcList().length ? `<em class="dm-badge">${C.hcList().length}</em>` : n ? `<em class="dm-badge soft">${n}</em>` : ''}
     </button>`;
+}
+function seasonCard() {
+    const sn = Season.seasonNow();
+    if (!sn || !Season.isFest(sn)) return '';
+    const off = !Season.decorOn();
+    return `<div class="dm-season"><b>${sn.ico} ${esc(sn.name)}${sn.who ? ` — ${esc(sn.who)}` : ''}</b><small>${off ? 'Сезонный декор выключен.' : `${esc(Season.seasonLine(sn))}. В домике — само; картинки комнат — «✨ Как сейчас».`}</small>
+        <div class="dm-actions">${btn('seasonToggle', off ? `${ic('sparkles')} Украшать` : 'Не украшать', '', 'sm ghost')}</div></div>`;
 }
 function homeHtml() {
     const sg = C.suggestions().length;
     const inv = C.M().items.filter(x => D.KINDS[x.kind]?.place).length;
-    const floors = D.FLOORS.map(f => `<div class="dm-floor f-${f.id}">
-        <div class="dm-plate">${f.n ? `<b>${f.n}</b>` : ic(f.id === 'roof' ? 'leaf' : 'car')}<span>${esc(f.short || f.name)}</span></div>
-        <div class="dm-floor-rooms n${f.rooms.length}">${f.rooms.map(id => tile(D.roomById(id))).join('')}</div>
-    </div>`).join('');
+    const h = D.home();
+    const deco = (t) => `<div class="dm-deco"><span>${esc(t)}</span></div>`;
+    const floors = D.floors().map(f => {
+        const rs = (f.rooms || []).map(D.roomById).filter(Boolean);
+        const n = rs.length + (rs.length && f.deco ? 1 : 0);
+        return `<div class="dm-floor f-${f.id}${rs.length ? '' : ' deco'}">
+        <div class="dm-plate">${f.n ? `<b>${esc(f.n)}</b>` : ic(f.ico || 'leaf')}<span>${esc(f.short || f.name)}</span></div>
+        <div class="dm-floor-rooms n${Math.min(4, rs.length ? n : (f.deco || []).length)}${rs.length ? '' : ' deco'}">${rs.map(tile).join('')}${(f.deco || []).map(deco).join('')}</div>
+    </div>`;
+    }).join('');
+    const st = D.site();
+    const sites = h.sites ? `<div class="dm-modes dm-sites">${h.sites.map(x => `<button class="${st?.id === x.id ? 'on' : ''}" data-dm="site" data-v="${x.id}">${ic(x.ico || 'home')}<span>${esc(x.name)}</span></button>`).join('')}</div>
+        <div class="dm-hint sm">${C.siteManual() ? `Выбрано руками. <button class="dm-mini" data-dm="site" data-v="">по дате</button>` : 'Само — по дате истории; тап — выбрать руками.'}</div>` : '';
     return `<button class="dm-hero" data-dm="gen">
             <span class="dm-hero-dice">${dieHtml(20, false)}</span>
             <span><b>Хэд-машина</b><small>Рандомные хэды с картинками. Понравился — на холодильник, и модель будет его знать.</small></span>
         </button>
         <div class="dm-quick">
             <button data-dm="shop">${ic('bag')}<span>Покупки</span></button>
-            <button data-dm="inv">${ic('box')}<span>Вещи${inv ? ` · ${inv}` : ''}</span></button>
+            ${Post.can() ? `<button data-dm="post" class="${Post.atDoor().length ? 'hot' : ''}">${ic('box')}<span>Посылки${Post.atDoor().length ? ` · ${Post.atDoor().length}` : Post.onWay().length ? ` · ${Post.onWay().length}` : ''}</span></button>` : ''}
+            <button data-dm="inv">${ic('lamp')}<span>Вещи${inv ? ` · ${inv}` : ''}</span></button>
             <button data-dm="sugg" class="${sg ? 'hot' : ''}">${ic('bell')}<span>Из постов${sg ? ` · ${sg}` : ''}</span></button>
             <button data-dm="roll">${ic('frame')}<span>Плёнка${Cz.roll().length ? ` · ${Cz.roll().length}` : ''}</span></button>
+            <button data-dm="chores">${ic('wand')}<span>Дела${Chores.open().length ? ` · ${Chores.open().length}` : ''}</span></button>
+            ${Board.boardRoom() ? `<button data-dm="mags">${ic('pin')}<span>${esc(Board.styleOf().title.split(' ')[0])}${Board.on(Board.boardRoom().id).length ? ` · ${Board.on(Board.boardRoom().id).length}` : ''}</span></button>` : ''}
+            ${Growth.can() ? `<button data-dm="growth">${ic('ruler')}<span>Рост</span></button>` : ''}
         </div>
+        ${Post.homeCard({ btn, ic })}
+        ${seasonCard()}
         ${Cz.snowCard()}
-        <div class="dm-sec"><span>Дом</span><em>${D.ROOMS.some(r => !C.roomImg(r.id)) ? `<button class="dm-mini" data-dm="drawHouse">${busy('house') ? spin : `${ic('brush')} нарисовать весь дом`}</button>` : 'кирпич, довоенный, над лавкой Марко'}</em></div>
-        <div class="dm-house"><i class="dm-roof"></i>${floors}</div>
-        <div class="dm-hint">Тап по комнате — зайти: полки, вещи, картинки. Лаборатория, зал и гараж — мостики в Ангар.</div>`;
+        <div class="dm-sec"><span>${esc(h.name)}</span><em>${D.roomsHere().some(r => !C.roomImg(r.id)) ? `<button class="dm-mini" data-dm="drawHouse">${busy('house') ? spin : `${ic('brush')} нарисовать ${h.id === '2024' ? 'весь дом' : 'всё'}`}</button>` : esc(h.sub)}</em></div>
+        ${sites}
+        <div class="dm-house h-${esc(st?.id === 'ship' ? 'ship' : h.style || 'brick')}"><i class="dm-roof"></i>${floors}</div>
+        <div class="dm-hint">${esc(h.hint || '')}</div>`;
 }
 
 // ───────────── комната ─────────────
 
 function roomHtml(r) {
-    const img = C.roomImg(r.id);
+    const pv = Season.roomPic(r.id);
+    const img = pv.img;
     const k = `room:${r.id}`;
     const placed = r.link ? [] : C.placedIn(r.id);
-    const pic = `<div class="dm-roompic${img ? '' : ' empty'}"${img ? ` style="background-image:url('${esc(img)}')" data-dm="zoom" data-v="${esc(img)}"` : ''}>
-        ${img ? '' : `<div>${ic(r.ico, 'xl')}<p>Комнату ещё не рисовали</p></div>`}
+    const pic = `<div class="dm-roompic${img ? '' : ' empty'}${pv.tint ? ` tint-${pv.tint}` : ''}"${img ? ` style="background-image:url('${esc(img)}')" data-dm="zoom" data-v="${esc(img)}"` : ''}>
+        ${img ? `<span class="dm-roompic-tag">${esc(Season.nowTag())}${pv.exact ? '' : ' · подкрашено'}</span>` : `<div>${ic(r.ico, 'xl')}<p>Комнату ещё не рисовали</p></div>`}
         <div class="dm-roompic-tools">
+            ${img && !pv.exact ? btn('drawNow', busy(`now:${r.id}`) ? spin : `${ic('sparkles')} Как сейчас`, attr({ v: r.id, title: 'Дорисовать: свет и праздник как сейчас' }), 'sm glass') : ''}
             ${btn('drawRoom', busy(k) ? spin : `${ic('brush')}${img ? '' : ' Нарисовать'}`, attr({ v: r.id, title: 'Нарисовать комнату' }), 'sm glass')}
             ${placed.some(x => x.img) ? btn('drawRoomItems', busy(k) ? spin : `${ic('wand')} С вещами`, attr({ v: r.id, title: 'Перерисовать с расставленными вещами' }), 'sm glass') : ''}
             <label class="dm-btn sm glass" title="Своя картинка">${ic('upload')}<input type="file" accept="image/*" data-dmup="room" data-id="${r.id}" hidden></label>
@@ -173,13 +214,14 @@ function roomHtml(r) {
     let view = pic;
     if (mode === 'doll') { try { view = Doll.sceneHtml(r) + Doll.barHtml(r); } catch (err) { console.error('[Дом] домик', err); view = `<div class="dm-empty">Домик упал: ${esc(err?.message || err)}</div>${pic}`; } }
     if (r.link) {
-        const [, hall] = r.link.split(':');
-        const txt = { lab: 'Лаборатория Хеди — это лаба Ангара: проекты, полигон, кубик инсайтов, кладбище прототипов.', spar: 'Тренировочный зал — спарринг в Ангаре: Баки учит Хеди, кубик, синяки, навыки растут и уходят в досье квартирмейстера.', gar: 'Гараж — в Ангаре: «Додж» баклажанового цвета, мотоцикл, бак, урон, номера.' }[hall];
-        return `${tabs}${view}<div class="dm-card bridge"><p>${esc(txt)}</p>${btn('angar', `${ic(r.ico)} Открыть: ${esc(LINK_WORD[r.link])}`, attr({ v: hall }), 'primary wide')}</div>`;
+        return `${tabs}${view}<div class="dm-card bridge"><p>${esc(r.linkTxt || '')}</p>${btn('link', `${ic(r.ico)} Открыть: ${esc(linkName(r))}`, attr({ v: r.link }), 'primary wide')}</div>`;
     }
     const shelves = (r.shelves || []).filter(k2 => k2 !== 'hc');
-    return `${tabs}${view}
-        ${r.id === 'kitchen' ? fridgeHtml() : ''}
+    const bridges = (r.bridges || []).map(b => `<div class="dm-card bridge"><p>${esc(b.txt || '')}</p>${btn('link', `${ic('flask')} ${esc(b.name)}`, attr({ v: b.to }), 'wide')}</div>`).join('');
+    return `${tabs}${view}${bridges}
+        ${r.board ? fridgeHtml(r) : ''}
+        ${r.door && Growth.can() ? `${sec('Дверной косяк', Growth.G().marks.length ? `отметок: ${Growth.G().marks.length}` : 'стена роста')}<div class="dm-doorbtn" data-dm="growth" role="button">${Growth.frameHtml({ compact: true })}</div>` : ''}
+        ${Chores.roomHtml(r, { btn, ic, sec })}
         ${sec('Что тут стоит', placed.length ? String(placed.length) : 'пусто')}
         ${placed.length ? `<div class="dm-things">${placed.map(thing).join('')}</div>` : '<div class="dm-hint">Купи, придумай или перенеси сюда вещь — появится тут. С картинками вещей комнату можно перерисовать «С вещами».</div>'}
         <div class="dm-actions">${btn('placeHere', `${ic('plus')} Поставить сюда`, attr({ v: r.id }), '')}${btn('shop', `${ic('bag')} Купить`, '', 'ghost')}</div>
@@ -192,7 +234,7 @@ function thing(it) {
         <b>${esc(C.cut(it.name, 40))}</b><small>${esc(D.spotName(it.spot) || K.one)}</small></button>`;
 }
 function shelfCard(k) {
-    const K = D.KINDS[k];
+    const K = D.kindOf(k);
     const list = C.itemsOf(k);
     const thumbs = list.filter(x => x.img).slice(0, 3);
     return `<button class="dm-shelf" data-dm="shelf" data-v="${k}">
@@ -204,7 +246,8 @@ function shelfCard(k) {
 
 // ───────────── холодильник: хэды и записки ─────────────
 
-function fridgeHtml() {
+function fridgeHtml(r) {
+    const [boardName] = D.boardOf(r) || ['Холодильник'];
     const list = [...C.hcList()].reverse();
     const notes = C.itemsOf('note').slice(0, 6);
     const pol = (h) => `<figure class="dm-pol mini${h.off ? ' off' : ''}" style="--tilt:${tilt(h.id) * 0.8}deg;--mag:${magnet(h.id)}" data-dm="hc" data-v="${esc(h.id)}">
@@ -213,9 +256,10 @@ function fridgeHtml() {
             <figcaption>${esc(C.cut(h.t, 90))}</figcaption>
         </figure>`;
     const note = (n) => `<button class="dm-sticky" style="--tilt:${tilt(n.id) * 1.2}deg" data-dm="item" data-v="${esc(n.id)}"><i class="dm-mag" style="--mag:${magnet(n.id)}"></i><p>${esc(C.cut(n.name, 120))}</p>${n.from ? `<small>— ${esc(C.short(n.from))}</small>` : ''}</button>`;
-    return `${sec('Холодильник', list.length ? `хэдов: ${list.length}` : 'пусто')}
-        <div class="dm-fridge">
+    return `${sec(esc(boardName), list.length ? `хэдов: ${list.length}` : 'пусто')}
+        <div class="dm-fridge b-${esc(r?.board || 'fridge')}">
             <div class="dm-fridge-h"><i></i></div>
+            ${r ? Board.layerHtml(r, { ic }) : ''}
             ${list.length || notes.length ? `<div class="dm-pols">${notes.map(note).join('')}${list.map(pol).join('')}</div>` : '<div class="dm-fridge-empty">Тут будут хэды на магнитах и записки. Крутани хэд-машину — что понравится, вешай сюда.</div>'}
         </div>
         <div class="dm-actions">${btn('gen', `${ic('dice')} Хэд-машина`, '', 'primary wide')}${btn('shelf', `${ic('note')} Записки`, attr({ v: 'note' }), '')}</div>`;
@@ -232,10 +276,23 @@ function paintModal() {
     if (!ui.modal) { box.classList.remove('on'); box.innerHTML = ''; return; }
     const top = box.querySelector('.dm-sheet')?.scrollTop || 0;
     let html = '';
-    try { html = { gen: genSheet, hc: hcSheet, zoom: zoomSheet, shelf: shelfSheet, item: itemSheet, shop: shopSheet, inv: invSheet, sugg: suggSheet, place: placeSheet, form: formSheet, pick: pickSheet, dlWall: () => Doll.wallSheet(sheetHead), dlFloor: () => Doll.floorSheet(sheetHead), dlFurn: () => Doll.furnSheet(sheetHead), roll: () => Cz.rollSheet({ head: sheetHead, btn, busy, spin, ic, ui }) }[ui.modal.kind]?.() || ''; } catch (err) { console.error('[Дом] лист', err); html = `<div class="dm-sheet">${sheetHead('Ой')}<div class="dm-empty">${esc(err?.message || err)}</div></div>`; }
+    try { html = { gen: genSheet, hc: hcSheet, zoom: zoomSheet, shelf: shelfSheet, item: itemSheet, shop: shopSheet, inv: invSheet, sugg: suggSheet, place: placeSheet, form: formSheet, pick: pickSheet, dlWall: () => Doll.wallSheet(sheetHead), dlFloor: () => Doll.floorSheet(sheetHead), dlFurn: () => Doll.furnSheet(sheetHead), roll: () => Cz.rollSheet({ head: sheetHead, btn, busy, spin, ic, ui }),
+        post: () => Post.sheet(H7()), chores: () => Chores.sheet(H7()), growth: () => Growth.sheet(H7()), growMark: () => Growth.markSheet(H7(), ui.modal.id), mag: () => Board.sheet(H7(), ui.modal.id), mags: magsSheet }[ui.modal.kind]?.() || ''; } catch (err) { console.error('[Дом] лист', err); html = `<div class="dm-sheet">${sheetHead('Ой')}<div class="dm-empty">${esc(err?.message || err)}</div></div>`; }
     box.innerHTML = html;
     box.classList.add('on');
     const s = box.querySelector('.dm-sheet'); if (s) s.scrollTop = top;
+}
+/** Помощники листов седьмой волны. */
+const H7 = () => ({ head: sheetHead, btn, ic, spin, busy, ui, sec, dieHtml, esc });
+function magsSheet() {
+    const r = Board.boardRoom();
+    const st = Board.styleOf(r);
+    const l = r ? Board.on(r.id) : [];
+    return `<div class="dm-sheet">${sheetHead(`${ic('pin')} ${esc(st.title)}`)}
+        <div class="dm-hint">${r ? `Висят: ${esc(D.boardOf(r)?.[0] || '')} (${esc(r.name)}). Таскай пальцем прямо там; тап — память.` : 'В этом доме некуда вешать.'}</div>
+        ${l.length ? `<div class="dm-things">${l.map(m => `<button class="dm-thing" data-dm="mag" data-v="${m.id}"><span class="dm-thing-ph${m.cutImg || m.img ? '' : ' empty'}"${m.cutImg || m.img ? ` style="background-image:url('${esc(m.cutImg || m.img)}');background-size:contain;background-repeat:no-repeat;background-position:center"` : ''}>${busy(`mag:${m.id}`) ? spin : m.img ? '' : ic('pin')}</span><b>${esc(m.place)}</b><small>${esc(m.when || '')}</small></button>`).join('')}</div>` : '<div class="dm-empty">Пусто. ＋ — своё, «Из истории» — места, где правда были.</div>'}
+        ${r ? `<div class="dm-actions">${btn('magAdd', `${ic('plus')} ${esc(st.one.charAt(0).toUpperCase() + st.one.slice(1))}`, attr({ room: r.id }), 'primary')}${btn('magStory', busy('mag:story') ? spin : `${ic('book')} Из истории`, '', 'ghost')}${btn('roomGo', `${ic('fridge')} ${esc(r.name)}`, attr({ v: r.id }), 'ghost')}</div>` : ''}
+    </div>`;
 }
 const zoomSheet = () => `<div class="dm-sheet zoom">${sheetHead('')}<img src="${esc(ui.modal.src)}" alt=""></div>`;
 
@@ -329,7 +386,7 @@ function itemSheet() {
         ${['card', 'note', 'joy'].includes(it.kind) ? '' : a('desc', 'Описание')}
         ${(FIELDS[it.kind] || []).map(([key, label, type]) => f(key, label, type)).join('')}
         ${['card', 'joy', 'diary'].includes(it.kind) ? '' : f('who', 'Чьё / про кого')}
-        ${K.place ? `<div class="dm-grid2"><label class="dm-field"><span>Комната</span><select data-dmf="it:room" data-id="${esc(it.id)}"><option value="">— не расставлено</option>${D.ROOMS.filter(r => !r.link).map(r => `<option value="${r.id}" ${it.room === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+        ${K.place ? `<div class="dm-grid2"><label class="dm-field"><span>Комната</span><select data-dmf="it:room" data-id="${esc(it.id)}"><option value="">— не расставлено</option>${D.placeRooms().map(r => `<option value="${r.id}" ${it.room === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
             <label class="dm-field"><span>Куда</span><select data-dmf="it:spot" data-id="${esc(it.id)}"><option value="">—</option>${D.SPOTS.map(([v, l]) => `<option value="${v}" ${it.spot === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label></div>` : ''}
         ${it.story ? `<div class="dm-hint">${esc(it.story)}</div>` : ''}
         <div class="dm-actions end">${btn('delItem', `${ic('x')} Убрать`, attr({ id: it.id }), 'ghost danger sm')}</div>
@@ -341,13 +398,13 @@ function itemSheet() {
 function invSheet() {
     const f = ui.inv.f;
     const all = C.M().items.filter(x => D.KINDS[x.kind]?.place && (!x.post || C.liveKeys().has(x.post)));
-    const list = f === 'all' ? all : f === 'free' ? all.filter(x => !x.room) : all.filter(x => x.kind === f);
+    const list = f === 'all' ? all : f === 'free' ? all.filter(x => !D.roomById(x.room)) : all.filter(x => x.kind === f);
     const by = {};
-    for (const x of list) (by[x.room || ''] ||= []).push(x);
-    const groups = [...D.ROOMS.filter(r => by[r.id]).map(r => [r.name, by[r.id]]), ...(by[''] ? [['Не расставлено', by['']]] : [])];
+    for (const x of list) (by[D.roomById(x.room) ? x.room : ''] ||= []).push(x);
+    const groups = [...D.placeRooms().filter(r => by[r.id]).map(r => [r.name, by[r.id]]), ...(by[''] ? [['Не расставлено', by['']]] : [])];
     return `<div class="dm-sheet">${sheetHead(`${ic('box')} Вещи дома`)}
         <div class="dm-actions">${btn('newThing', `${ic('plus')} Вещь`, '', 'primary')}${btn('photoChat', `${ic('frame')} Фото из чата`, '', '')}${btn('photoShoot', `${ic('sparkles')} Снять фото`, '', '')}${btn('story', busy('story') ? spin : `${ic('book')} Из истории`, '', 'ghost')}</div>
-        <div class="dm-chips">${[['all', 'Все'], ['free', 'Не расставлено'], ...D.PLACE_KINDS.map(k => [k, D.KINDS[k].name])].map(([v, l]) => `<button class="dm-chip${f === v ? ' on' : ''}" data-dm="invF" data-v="${v}">${esc(l)}</button>`).join('')}</div>
+        <div class="dm-chips">${[['all', 'Все'], ['free', 'Не расставлено'], ...D.PLACE_KINDS.map(k => [k, D.kindOf(k).name])].map(([v, l]) => `<button class="dm-chip${f === v ? ' on' : ''}" data-dm="invF" data-v="${v}">${esc(l)}</button>`).join('')}</div>
         ${groups.length ? groups.map(([t, l]) => `${sec(esc(t), String(l.length))}<div class="dm-things">${l.map(thing).join('')}</div>`).join('') : '<div class="dm-empty">Пусто. Купи, добавь своё или достань из истории.</div>'}
     </div>`;
 }
@@ -358,7 +415,7 @@ function shopSheet() {
     const k = `shop:${cat}`;
     return `<div class="dm-sheet">${sheetHead(`${ic('bag')} Покупки`)}
         <div class="dm-hint">${bal ? `${ic('pin')} на счету ${esc(bal.text)} — ${bal.life ? 'платит тот, кто платит за дом (Life → Деньги)' : 'оплата с телефона'}` : 'банк Телефона не найден — покупки без списания'}</div>
-        <div class="dm-chips">${D.SHOP_CATS.map(([v, l]) => `<button class="dm-chip${cat === v ? ' on' : ''}" data-dm="shopCat" data-v="${v}">${esc(l)}</button>`).join('')}</div>
+        <div class="dm-chips">${D.SHOP_CATS.filter(([v]) => v !== 'baby' || D.home().id === '2024').map(([v, l]) => `<button class="dm-chip${cat === v ? ' on' : ''}" data-dm="shopCat" data-v="${v}">${esc(l)}</button>`).join('')}</div>
         <div class="dm-ask"><input data-dmf="shop:ask" value="${esc(ui.shop.ask)}" placeholder="что ищем: «лампу с тёплым светом для его кресла»">${btn('shopGen', busy(k) ? spin : ic('sparkles'), attr({ title: 'Показать' }), 'ico primary')}</div>
         ${list.length ? `<div class="dm-goods">${list.map((x, i) => `<div class="dm-good">
             <span class="dm-row-ph${x.img ? '' : ' empty'}"${x.img ? ` style="background-image:url('${esc(x.img)}')"` : ''}>${busy(`good:${x._id}`) ? spin : x.img ? '' : ic(D.kindOf(D.SHOP_KIND[cat] || 'decor').ico)}</span>
@@ -542,10 +599,13 @@ const HANDLERS = {
     close: () => close(),
     home: () => go('home'),
     room: (el) => { const r = D.roomById(el.dataset.v); if (r) go('room', r.id); },
-    angar: (el) => { if (!globalThis.Angar?.open) { C.toast('info', 'Ангар не найден — поставь его, и этаж откроется там'); return; } close(); setTimeout(() => globalThis.Angar.open(el.dataset.v), 220); },
+    roomGo: (el) => { const r = D.roomById(el.dataset.v); if (!r) return; ui.modal = null; paintModal(); go('room', r.id); },
+    angar: (el) => openLink(`angar:${el.dataset.v}`),
+    link: (el) => openLink(el.dataset.v),
+    site: (el) => { C.setSite(el.dataset.v); render(); C.toast('success', el.dataset.v ? `Живут: ${D.site()?.name}` : 'Где живут — по дате истории'); },
     drawRoom: (el) => { const r = D.roomById(el.dataset.v); withBusy(`room:${r.id}`, async () => { await C.drawRoom(r); C.toast('success', `${r.name} — готово`); }); },
     drawHouse: () => withBusy('house', async () => {
-        const todo = D.ROOMS.filter(r => !C.roomImg(r.id));
+        const todo = D.roomsHere().filter(r => !C.roomImg(r.id));
         for (const r of todo) { ui.busy.add(`room:${r.id}`); render(); try { await C.drawRoom(r); } finally { ui.busy.delete(`room:${r.id}`); render(); } }
         C.toast('success', 'Дом нарисован');
     }),
@@ -621,9 +681,9 @@ const HANDLERS = {
     invF: (el) => { ui.inv.f = el.dataset.v; paintModal(); },
     placeHere: (el) => modal('place', { room: el.dataset.v }),
     putHere: (el) => { const it = C.itemById(el.dataset.id); if (!it) return; C.setItem(it.id, { room: el.dataset.room, spot: it.spot || DEFAULT_SPOT[it.kind] || 'shelf' }); C.toast('success', `${it.name} — в ${D.roomById(el.dataset.room)?.name.toLowerCase()}`); paintModal(); render(); },
-    newThing: (el) => form('Новая вещь', [{ k: 'name', label: 'Что это', ph: 'винтажная лампа с зелёным абажуром' }, { k: 'kind', label: 'Какая полка', type: 'select', v: 'decor', list: D.PLACE_KINDS.map(k => [k, D.KINDS[k].name]) }, { k: 'room', label: 'Куда', type: 'select', v: el.dataset.room || '', list: [['', '— пока никуда'], ...D.ROOMS.filter(r => !r.link).map(r => [r.id, r.name])] }, { k: 'who', label: 'Чьё / кто подарил', ph: 'подарок Тони' }], (v) => { if (!v.name.trim()) return false; const it = C.addItem(v.kind, { name: v.name, who: v.who, room: v.room, spot: v.room ? DEFAULT_SPOT[v.kind] || 'shelf' : '' }, { src: 'me', room: v.room }); drawItems([it]); modal('item', { id: it.id }); return 'keep'; }, 'Добавить'),
-    photoChat: () => { const list = C.chatImages(40); modal('pick', { title: 'Фото из чата', list, img: true, sel: new Set(), ok: 'Повесить', onOk: (sel) => { for (const x of sel) C.addItem('photo', { name: `Фото из поста #${x.mes}`, img: x.src, room: 'living', spot: 'wall' }, { src: 'chat', room: 'living', spot: 'wall' }); C.toast('success', `Повешено: ${sel.length}`); } }); },
-    photoShoot: () => form('Снять фото на память', [{ k: 'name', label: 'Что на фото', ph: 'они вдвоём на крыше под снегом, она в его куртке' }, { k: 'room', label: 'Куда повесить', type: 'select', v: 'living', list: D.ROOMS.filter(r => !r.link).map(r => [r.id, r.name]) }], (v) => { if (!v.name.trim()) return false; const it = C.addItem('photo', { name: v.name, desc: v.name, room: v.room, spot: 'wall' }, { src: 'me' }); drawQueue([it], C.drawItem, (x) => `item:${x.id}`); modal('item', { id: it.id }); return 'keep'; }, 'Снять'),
+    newThing: (el) => form('Новая вещь', [{ k: 'name', label: 'Что это', ph: 'винтажная лампа с зелёным абажуром' }, { k: 'kind', label: 'Какая полка', type: 'select', v: 'decor', list: D.PLACE_KINDS.map(k => [k, D.kindOf(k).name]) }, { k: 'room', label: 'Куда', type: 'select', v: el.dataset.room || '', list: [['', '— пока никуда'], ...D.placeRooms().map(r => [r.id, r.name])] }, { k: 'who', label: 'Чьё / кто подарил', ph: 'подарок Тони' }], (v) => { if (!v.name.trim()) return false; const it = C.addItem(v.kind, { name: v.name, who: v.who, room: v.room, spot: v.room ? DEFAULT_SPOT[v.kind] || 'shelf' : '' }, { src: 'me', room: v.room }); drawItems([it]); modal('item', { id: it.id }); return 'keep'; }, 'Добавить'),
+    photoChat: () => { const list = C.chatImages(40); modal('pick', { title: 'Фото из чата', list, img: true, sel: new Set(), ok: 'Повесить', onOk: (sel) => { const room = D.roomFor('book') || D.placeRooms()[0]?.id || ''; for (const x of sel) C.addItem('photo', { name: `Фото из поста #${x.mes}`, img: x.src, room, spot: 'wall' }, { src: 'chat', room, spot: 'wall' }); C.toast('success', `Повешено: ${sel.length}`); } }); },
+    photoShoot: () => form('Снять фото на память', [{ k: 'name', label: 'Что на фото', ph: 'они вдвоём на крыше под снегом, она в его куртке' }, { k: 'room', label: 'Куда повесить', type: 'select', v: D.roomFor('book') || D.placeRooms()[0]?.id || '', list: D.placeRooms().map(r => [r.id, r.name]) }], (v) => { if (!v.name.trim()) return false; const it = C.addItem('photo', { name: v.name, desc: v.name, room: v.room, spot: 'wall' }, { src: 'me' }); drawQueue([it], C.drawItem, (x) => `item:${x.id}`); modal('item', { id: it.id }); return 'keep'; }, 'Снять'),
     story: () => withBusy('story', async () => { const list = await C.fromStory(); modal('pick', { title: 'Из истории — что у них дома', list, img: false, sel: new Set(list.map((_, i) => i)), ok: 'В дом', onOk: (sel) => { const added = sel.map(x => C.addItem(D.KINDS[x.kind] ? x.kind : 'decor', x, { src: 'story' })); drawItems(added); C.toast('success', `В доме: ${added.length}`); } }); }),
     pickT: (el) => { const p = ui.modal; const i = Number(el.dataset.v); if (p.sel.has(i)) p.sel.delete(i); else p.sel.add(i); paintModal(); },
     pickOk: () => { const p = ui.modal; const sel = [...p.sel].map(i => p.list[i]).filter(Boolean); p.onOk(sel); closeModal(); },
@@ -651,6 +711,122 @@ Object.assign(HANDLERS, {
     rollChat: () => { const n = Cz.fromChat(); C.toast(n ? 'success' : 'info', n ? `Из чата: ${n}` : 'Новых картинок в чате нет'); paintModal(); render(); },
     snowScene: (el) => { if (Cz.snowScene(el.dataset.v)) C.toast('success', 'Уютная сцена — в следующий ответ'); },
 });
+// ───────────── седьмая волна: посылки, дела, рост, магниты, сезон и свет ─────────────
+
+const addPieceTo = (room, t) => Doll.addPiece(Doll.roomState(room), t);
+Object.assign(HANDLERS, {
+    post: () => { Post.tick(); modal('post'); },
+    postIdeas: () => withBusy('post:ideas', () => Post.ideas(ui.post.ask)),
+    postBuy: (el) => {
+        const x = Post.lastIdeas()[Number(el.dataset.v)]; if (!x) return;
+        withBusy(`pbuy:${x._id}`, async () => {
+            const p = await Post.buyOrder(x);
+            C.M().postIdeas = Post.lastIdeas().filter(y => y !== x); C.touch();
+            C.toast('success', `📦 ${esc(p.name)} — заказано. Кубик ${p.roll}: ${esc(Post.FATE_RU[p.fate])}${p.paid ? ` · ${esc(p.paid)}` : ''}`);
+        });
+    },
+    postOwn: () => form('Своя посылка', [{ k: 'name', label: 'Что заказала', ph: 'плюшевая акула в человеческий рост' }, { k: 'from', label: 'Где', ph: 'маркетплейс' }, { k: 'price', label: 'Цена ($, необязательно)', ph: '40' }, { k: 'abroad', label: 'Откуда едет', type: 'select', v: '', list: [['', 'из своей страны'], ['1', 'из-за границы — дольше']] }], async (v) => {
+        if (!v.name.trim()) return false;
+        const p = await Post.buyOrder({ name: v.name, from: v.from, price: v.price, abroad: !!v.abroad });
+        C.toast('success', `📦 ${esc(p.name)} — кубик ${p.roll}: ${esc(Post.FATE_RU[p.fate])}`);
+        modal('post');
+        return 'keep';
+    }, 'Заказать'),
+    postOpen: (el) => {
+        const id = el.dataset.v;
+        withBusy(`open:${id}`, async () => {
+            await new Promise(r => setTimeout(r, 900));
+            const r = Post.unpack(id);
+            if (!r) return;
+            C.toast('success', r.wrong ? `Привезли не то: ${esc(r.it.name)} 🙃` : `${esc(r.it.name)} — в доме${r.extra ? ` · и сверху: ${esc(r.extra.name)}` : ''}`);
+            drawItems([r.it, r.extra].filter(Boolean));
+        });
+    },
+    postScene: (el) => {
+        const r = Post.unpack(el.dataset.v);
+        if (!r) return;
+        C.shot('post', `[Посылки: ${C.short(C.userName())} распаковывает посылку — «${r.p.name}»${r.wrong ? `, а внутри — ${r.it.name} (привезли не то)` : ''}${r.extra ? `, сверху подарок: ${r.extra.name}` : ''}.${r.p.chk?.t ? ` ${r.p.chk.t}` : ''} Покажи это в сцене — мелочью, весело.]`);
+        C.toast('success', 'Распаковка — в следующий пост');
+        drawItems([r.it, r.extra].filter(Boolean));
+        paintModal(); render();
+    },
+    postFetch: (el) => {
+        const p = Post.list().find(x => x.id === el.dataset.v); if (!p) return;
+        C.shot('post', `[Ночной сброс: контейнер с «${p.name}» ушёл не на ту поляну — до немцев ближе, чем до своих. Если к месту — за ним идут.]`);
+        Post.dismiss(p.id); C.toast('success', 'Вылазка за контейнером — в следующий пост'); paintModal(); render();
+    },
+    postGone: (el) => { Post.dismiss(el.dataset.v); paintModal(); render(); },
+    postAgain: (el) => { const p = Post.reorder(el.dataset.v); if (p) C.toast('success', `Заказано заново — кубик ${p.roll}: ${esc(Post.FATE_RU[p.fate])}`); paintModal(); },
+    postDrop: (el) => { Post.drop(el.dataset.v); paintModal(); render(); },
+    // дела
+    chores: () => modal('chores'),
+    choreWho: (el) => { ui.chore.who = el.dataset.v; if (C.same(ui.chore.help, ui.chore.who)) ui.chore.help = ''; paintModal(); },
+    choreHelp: (el) => { ui.chore.help = el.dataset.v; paintModal(); },
+    choreAdd: () => { const x = Chores.add(ui.chore.ask, { room: ui.room && D.roomById(ui.room) && !D.roomById(ui.room).link ? ui.room : '' }); if (!x) { C.toast('info', 'Напиши дело (или такое уже есть)'); return; } ui.chore.ask = ''; paintModal(); render(); },
+    choreIdeas: () => withBusy('chore:ideas', async () => { const l = await Chores.ideas(ui.chore.ask); C.toast(l.length ? 'success' : 'info', l.length ? `В список: ${l.length}` : 'Ничего нового'); }),
+    choreGo: (el) => {
+        const id = el.dataset.v;
+        const key = `chore:${id}`;
+        if (ui.busy.has(key)) return;
+        ui.busy.add(key); paintModal();
+        setTimeout(() => withBusyRun(key, async () => {
+            const x = await Chores.attempt(id, { who: ui.chore.who || Chores.doerDefault(), help: ui.chore.help, addPiece: addPieceTo });
+            C.toast(['good', 'perfect', 'meh'].includes(x.tier) ? 'success' : 'info', `🎲 ${x.roll}${x.mod ? ` ${x.mod > 0 ? '+' : '−'} ${Math.abs(x.mod)}` : ''} = ${x.total} — ${esc(Chores.TIER_RU[x.tier])}${x.made ? ` · в домике: ${esc(x.made)}` : ''}`);
+        }), 700);
+    },
+    choreScene: (el) => { if (Chores.toScene(el.dataset.v)) C.toast('success', 'Уйдёт в следующий пост'); },
+    choreDel: (el) => { Chores.del(el.dataset.v); paintModal(); render(); },
+    // рост
+    growth: () => { Growth.loadZr().then(() => { if (ui.modal?.kind === 'growth') paintModal(); }); modal('growth'); },
+    growKid: (el) => { ui.grow.kid = el.dataset.v; ui.grow.cm = ''; paintModal(); },
+    growNewKid: () => form('Кого ещё меряем', [{ k: 'name', label: 'Имя', ph: 'Питер' }, { k: 'born', label: 'Родился (ГГГГ-ММ)', ph: '2018-06' }, { k: 'sex', label: 'Кто', type: 'select', v: 'F', list: [['F', 'она'], ['M', 'он']] }], (v) => { const k = Growth.addKid(v); if (!k) return false; ui.grow.kid = k.id; modal('growth'); return 'keep'; }, 'Добавить'),
+    growAdd: () => {
+        const ps = Growth.people();
+        const p = Growth.personById(ui.grow.kid) || ps[0];
+        const cm = Number(String(ui.grow.cm || '').replace(',', '.')) || Growth.suggest(p);
+        const x = Growth.mark({ kid: p?.id, cm, by: ui.grow.by || C.cast().find(n => /баки|bucky/i.test(n)) || C.userName(), note: ui.grow.note });
+        if (!x) { C.toast('info', 'Нужен рост в сантиметрах'); return; }
+        ui.grow.cm = ''; ui.grow.note = '';
+        C.toast('success', `${esc(x.who)} — ${x.cm} см${Growth.delta(x) ? ` (${esc(Growth.delta(x))})` : ''}`);
+        paintModal(); render();
+    },
+    growMark: (el) => modal('growMark', { id: el.dataset.v }),
+    growScene: (el) => { if (Growth.toScene(el.dataset.v)) C.toast('success', 'Отметка — в следующий пост'); },
+    growDel: (el) => { if (!confirm('Стереть отметку с косяка?')) return; Growth.delMark(el.dataset.v); modal('growth'); render(); },
+    // магниты
+    mags: () => modal('mags'),
+    mag: (el) => modal('mag', { id: el.dataset.v }),
+    magAdd: (el) => {
+        const st = Board.styleOf(D.roomById(el.dataset.room));
+        form(`${st.one.charAt(0).toUpperCase() + st.one.slice(1)} — откуда`, [{ k: 'place', label: 'Место', ph: 'Бухарест' }, { k: 'when', label: 'Когда (необязательно)', ph: 'весна 2016-го' }, { k: 'line', label: 'Что там было (необязательно)', type: 'area', ph: 'он купил ей сливы на рынке' }], (v) => {
+            const m = Board.add({ ...v, room: el.dataset.room });
+            if (!m) { C.toast('info', 'Нужно место (или такое уже висит)'); return false; }
+            if (C.cfg().autoDraw) withBusy(`mag:${m.id}`, () => Board.draw(m));
+            modal('mag', { id: m.id });
+            return 'keep';
+        }, 'Повесить');
+    },
+    magDraw: (el) => { const m = Board.byId(el.dataset.v); if (m) withBusy(`mag:${m.id}`, () => Board.draw(m)); },
+    magScene: (el) => { if (Board.toScene(el.dataset.v)) C.toast('success', 'Вспомнят в следующем посте'); },
+    magDel: (el) => { Board.del(el.dataset.v); closeModal(); },
+    magStory: () => withBusy('mag:story', async () => {
+        const list = await Board.fromStory();
+        modal('pick', { title: 'Где они были', list: list.map(x => ({ ...x, name: x.place, kind: 'decor', who: [x.when, x.line].filter(Boolean).join(' — ') })), img: false, sel: new Set(list.map((_, i) => i)), ok: 'Повесить', onOk: (sel) => {
+            const added = sel.map(x => Board.add({ place: x.place, when: x.when, line: x.line, who: x.who === [x.when, x.line].filter(Boolean).join(' — ') ? '' : x.who, src: 'story' })).filter(Boolean);
+            C.toast('success', `Повешено: ${added.length}`);
+            if (C.cfg().autoDraw) (async () => { for (const m of added) { ui.busy.add(`mag:${m.id}`); render(); try { await Board.draw(m); } catch (e) { C.toast('warning', esc(String(e?.message || e))); break; } finally { ui.busy.delete(`mag:${m.id}`); render(); paintModal(); } } })();
+        } });
+    }),
+    // сезон и свет
+    drawNow: (el) => { const r = D.roomById(el.dataset.v); if (r) withBusy(`now:${r.id}`, async () => { await Season.drawNow(r); C.toast('success', `${r.name} — как сейчас: ${esc(Season.nowTag())}`); }); },
+    seasonToggle: () => { C.cfg().season = Season.decorOn() ? 'off' : 'auto'; C.saveCfg(); for (const r of D.rooms()) { try { Doll.roomState(r.id); } catch { /* */ } } render(); try { C.A?.updatePrompt?.(); } catch { /* */ } },
+});
+/** Как withBusy, но ключ уже занят (кубик крутится). */
+async function withBusyRun(key, fn) {
+    try { await fn(); } catch (e) { console.warn('[Дом]', key, e); C.toast('error', esc(String(e?.message || e))); } finally { ui.busy.delete(key); render(); paintModal(); }
+}
+Board.bind({ modal: (k, x) => modal(k, x), render: () => render() });
+
 Object.assign(HANDLERS, Doll.handlers({ render: () => render(), modal, closeModal, paintModal: () => paintModal(), withBusy }));
 Doll.bind({ render: () => render(), modal, closeModal, paintModal: () => paintModal(), withBusy, busy: (k) => ui.busy.has(k) });
 
@@ -673,6 +849,10 @@ export function onChange(e) {
     else if (f === 'shelf:ask') ui.shelf.ask = el.value;
     else if (f.startsWith('dl:')) Doll.onField(f, el.value);
     else if (f === 'roll:ask') ui.roll.ask = el.value;
+    else if (f === 'post:ask') ui.post.ask = el.value;
+    else if (f === 'chore:ask') ui.chore.ask = el.value;
+    else if (f.startsWith('grow:')) ui.grow[f.slice(5)] = el.value;
+    else if (f.startsWith('mag:')) { const m = Board.byId(el.dataset.id); if (m) { m[f.slice(4)] = C.cut(el.value, 300); C.touch(); try { C.A?.updatePrompt?.(); } catch { /* */ } } }
     else if (f === 'cfg:autoDraw') { C.cfg().autoDraw = !!el.checked; C.saveCfg(); }
     else if (f.startsWith('it:')) {
         const it = C.itemById(el.dataset.id); if (!it) return;
@@ -693,6 +873,9 @@ export function onInput(e) {
     if (f === 'shelf:ask') ui.shelf.ask = e.target.value;
     if (f?.startsWith?.('dl:')) Doll.onField(f, e.target.value);
     if (f === 'roll:ask') ui.roll.ask = e.target.value;
+    if (f === 'post:ask') ui.post.ask = e.target.value;
+    if (f === 'chore:ask') ui.chore.ask = e.target.value;
+    if (f?.startsWith?.('grow:') && f !== 'grow:by') ui.grow[f.slice(5)] = e.target.value;
 }
 async function upload(el) {
     const file = el.files?.[0];

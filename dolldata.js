@@ -52,6 +52,16 @@ function skyline(ph) {
     return `${city} 0 100%/120px 60px repeat-x, linear-gradient(${top}, ${low})`;
 }
 
+/** Вид во двор-колодец: задники кирпичных домов, окна, небо по времени. */
+function yard(ph) {
+    const [top, low] = SKY[ph] || SKY.day;
+    const night = ph === 'night' || ph === 'dusk';
+    const w = night ? '#f6d27a' : 'rgba(255,255,255,.4)';
+    const backs = svgUrl(svg(80, 70, `<rect x='0' y='14' width='38' height='56' fill='${night ? '#3a2522' : '#8c4a3a'}'/><rect x='42' y='4' width='38' height='66' fill='${night ? '#2e2220' : '#7a4334'}'/>`
+        + `<g fill='${w}'><rect x='6' y='22' width='6' height='8'/><rect x='22' y='22' width='6' height='8'/><rect x='6' y='40' width='6' height='8'/><rect x='48' y='12' width='6' height='8'/><rect x='64' y='30' width='6' height='8'/><rect x='48' y='48' width='6' height='8'/></g>`));
+    return `${backs} 0 100%/80px 70px repeat-x, linear-gradient(${top}, ${low})`;
+}
+
 /** Обои. bg(фаза) → CSS background (в координатах стены, без перекоса). */
 export const WALLS = [
     { id: 'brick', name: 'Кирпич', bg: () => `${bricks(['#a24e3c', '#97462f', '#9b4837', '#a9533f', '#a04b3b'], '#c9a089')} 0 0/26px 17px` },
@@ -74,6 +84,15 @@ export const WALLS = [
     { id: 'blueprint', name: 'Чертёж', bg: () => 'linear-gradient(rgba(255,255,255,.14) 1px, transparent 1px) 0 0/12px 12px, linear-gradient(90deg, rgba(255,255,255,.14) 1px, transparent 1px) 0 0/12px 12px, #1f4d78' },
     { id: 'concrete', name: 'Бетон', bg: () => 'radial-gradient(rgba(0,0,0,.08) 1px, transparent 1.5px) 0 0/7px 7px, radial-gradient(rgba(255,255,255,.1) 1px, transparent 1.5px) 3px 4px/9px 9px, #9b9b96' },
     { id: 'skyline', name: 'Небо и город', bg: (ph) => skyline(ph) },
+    // эпохи
+    { id: 'canvas', name: 'Брезент палатки', bg: () => 'repeating-linear-gradient(90deg, rgba(0,0,0,.13) 0 1px, transparent 1px 44px), repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 2px, transparent 2px 5px), linear-gradient(180deg, #7f7b52, #686543)' },
+    { id: 'peel', name: 'Облезлая краска', bg: () => 'radial-gradient(ellipse 16px 10px at 30% 40%, #bdb6a8 0 58%, transparent 62%) 0 0/62px 50px, radial-gradient(ellipse 11px 7px at 72% 70%, #c9c2b3 0 55%, transparent 60%) 0 0/74px 54px, radial-gradient(circle at 80% 88%, rgba(58,74,46,.38) 0 7px, transparent 11px) 0 0/96px 72px, linear-gradient(180deg, #8f948f, #7a7f7a)' },
+    { id: 'drywall', name: 'Тонкий гипсокартон', bg: () => 'linear-gradient(90deg, transparent 0 49.4%, rgba(0,0,0,.13) 49.4% 50.6%, transparent 50.6%) 0 0/84px 100%, radial-gradient(circle at 20% 30%, rgba(0,0,0,.05) 0 3px, transparent 4px) 0 0/40px 40px, #d8d4cc' },
+    { id: 'veneer', name: 'Панели трейлера', bg: () => 'repeating-linear-gradient(90deg, rgba(0,0,0,.3) 0 1.5px, transparent 1.5px 24px), repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 6px, transparent 6px 12px), linear-gradient(90deg, #8a6340, #77522f)' },
+    { id: 'planksv', name: 'Доски сарая', bg: () => 'repeating-linear-gradient(90deg, #3f2a1b 0 2px, transparent 2px 22px), linear-gradient(90deg, #7a5a3c, #6b4e33 30%, #7d5c3d 60%, #6f5035)' },
+    { id: 'hull', name: 'Обшивка корабля', bg: () => 'radial-gradient(circle, rgba(255,255,255,.32) .8px, transparent 1.4px) 2px 2px/24px 24px, linear-gradient(rgba(0,0,0,.34) 1px, transparent 1px) 0 0/48px 24px, linear-gradient(90deg, rgba(0,0,0,.34) 1px, transparent 1px) 0 0/48px 24px, linear-gradient(180deg, #5d6571, #49505b)' },
+    { id: 'plaster', name: 'Штукатурка', bg: () => 'radial-gradient(rgba(0,0,0,.035) 1px, transparent 1.6px) 0 0/6px 6px, #e6dccb' },
+    { id: 'yard', name: 'Двор-колодец', bg: (ph) => yard(ph) },
 ];
 export const FLOORS = [
     { id: 'planks', name: 'Доски', bg: () => `${PLANKS} 0 0/48px 18px` },
@@ -86,6 +105,12 @@ export const FLOORS = [
     { id: 'rubber', name: 'Резина', bg: () => 'linear-gradient(rgba(0,0,0,.4) 1px, transparent 1px) 0 0/30px 30px, linear-gradient(90deg, rgba(0,0,0,.4) 1px, transparent 1px) 0 0/30px 30px, #3b3d42' },
     { id: 'deck', name: 'Настил', bg: () => `${DECK} 0 0/60px 20px` },
     { id: 'turf', name: 'Газон', bg: () => 'radial-gradient(rgba(30,70,30,.35) 1px, transparent 1.6px) 0 0/6px 6px, radial-gradient(rgba(170,220,130,.35) 1px, transparent 1.6px) 3px 3px/7px 7px, #6c9a4f' },
+    // эпохи
+    { id: 'dirt', name: 'Земля и лапник', bg: () => 'radial-gradient(rgba(50,34,18,.38) 1px, transparent 1.6px) 0 0/7px 7px, radial-gradient(rgba(205,185,125,.38) .8px, transparent 1.4px) 3px 4px/9px 9px, repeating-linear-gradient(35deg, transparent 0 14px, rgba(70,90,50,.25) 14px 15px), linear-gradient(135deg, #6b5536, #574430)' },
+    { id: 'lino', name: 'Старый линолеум', bg: () => 'linear-gradient(90deg, rgba(0,0,0,.09) 1px, transparent 1px) 0 0/34px 34px, linear-gradient(rgba(0,0,0,.09) 1px, transparent 1px) 0 0/34px 34px, radial-gradient(ellipse at 30% 60%, rgba(90,70,40,.2), transparent 42%) 0 0/120px 90px, #c4b596' },
+    { id: 'vinyl', name: 'Пол трейлера', bg: () => 'conic-gradient(#b9a588 25%, #a89275 0 50%, #b9a588 0 75%, #a89275 0) 0 0/18px 18px' },
+    { id: 'grate', name: 'Решётка', bg: () => 'repeating-linear-gradient(45deg, #2b2e33 0 2px, transparent 2px 7px), repeating-linear-gradient(-45deg, #2b2e33 0 2px, transparent 2px 7px), #5a5f66' },
+    { id: 'deckplate', name: 'Палуба', bg: () => 'radial-gradient(ellipse 3px 1.2px at 50% 50%, rgba(255,255,255,.28), transparent 70%) 0 0/10px 10px, linear-gradient(rgba(0,0,0,.3) 1px, transparent 1px) 0 0/60px 60px, linear-gradient(90deg, rgba(0,0,0,.3) 1px, transparent 1px) 0 0/60px 60px, #6b717a' },
 ];
 export const wallById = (id) => WALLS.find(w => w.id === id) || null;
 export const floorById = (id) => FLOORS.find(w => w.id === id) || null;
@@ -133,6 +158,19 @@ function garland(len) {
     return { parts, glow };
 }
 const G = garland(4.4);
+function hearts(len) {
+    const parts = [b(0, 0, 0.3, len, 0.02, 0.02, '#c9a5b8')];
+    for (let u = 0.15, i = 0; u < len - 0.2; u += 0.45, i++) parts.push(b(u, 0.02, 0.02 + (i % 2) * 0.06, 0.22, 0.06, 0.22, i % 2 ? '#f0a3b6' : '#e0506a'));
+    return parts;
+}
+function bunting(len) {
+    const parts = [b(0, 0, 0.32, len, 0.02, 0.02, '#e8e2d6')];
+    const C3 = ['#c0392b', '#f1ece4', '#2f4f8f'];
+    for (let u = 0.1, i = 0; u < len - 0.25; u += 0.42, i++) parts.push(b(u, 0.02, 0, 0.3, 0.03, 0.3, C3[i % 3]));
+    return parts;
+}
+function rungs() { const out = []; for (let z = 0.5; z < 5.6; z += 0.6) out.push(b(0, 0.02, z, 1.2, 0.08, 0.06, 'm')); return out; }
+function rail(len) { const out = [b(0, 0, 1.45, len, 0.3, 0.12, 'm'), b(0, 0, 0.7, len, 0.3, 0.06, 'm')]; for (let u = 0; u <= len - 0.1; u += 0.8) out.push(b(u, 0.1, 0, 0.1, 0.1, 1.45, 'm')); return out; }
 
 /**
  * Каталог. Напольные: w×d — след, parts — коробки, top — высота поверхности, на которую можно ставить вещи.
@@ -190,10 +228,64 @@ export const FURN = {
     clock: { name: 'Часы', cat: 'wall', wall: true, len: 0.9, z: 4.3, col: '#f3efe8', parts: [b(0, 0, 0, 0.9, 0.08, 0.9, 'm'), b(0.43, 0.08, 0.45, 0.04, 0.02, 0.3, '#333333'), b(0.45, 0.08, 0.43, 0.25, 0.02, 0.04, '#333333')] },
     garland: { name: 'Гирлянда', cat: 'light', wall: true, len: 4.4, z: 5.2, col: '#3a3a3a', parts: G.parts, glow: G.glow },
     holoscreen: { name: 'Голоэкран', cat: 'lab', wall: true, len: 2.6, z: 2.8, col: 'rgba(110,215,255,.3)', parts: [b(0, 0.3, 0, 2.6, 0.02, 1.6, 'm')], glow: [[1.3, 0.3, 0.8, '#6fd8ff', 3.2, 'always']] },
+    // ── сезонное ──
+    xtree: { name: 'Ёлка', cat: 'season', w: 1.8, d: 1.8, col: '#2f6b3a', acc: '#d9483b', parts: [b(0.55, 0.55, 0, 0.7, 0.7, 0.3, '#9e3b34'), b(0.78, 0.78, 0.3, 0.24, 0.24, 0.3, '#6b4a2b'), b(0.1, 0.1, 0.6, 1.6, 1.6, 0.9, 'm'), b(0.3, 0.3, 1.5, 1.2, 1.2, 0.85, 'm2'), b(0.48, 0.48, 2.35, 0.84, 0.84, 0.75, 'm'), b(0.66, 0.66, 3.1, 0.48, 0.48, 0.6, 'm2'), b(0.82, 0.82, 3.7, 0.16, 0.16, 0.28, '#ffd54a'),
+        b(1.7, 0.4, 0.95, 0.1, 0.16, 0.16, 'a'), b(1.7, 1.1, 1.2, 0.1, 0.16, 0.16, '#ffd54a'), b(0.5, 1.7, 1.0, 0.16, 0.1, 0.16, '#7bdff2'), b(1.2, 1.7, 1.25, 0.16, 0.1, 0.16, 'a'), b(1.5, 0.7, 1.85, 0.1, 0.14, 0.14, '#7bdff2'), b(0.8, 1.5, 1.9, 0.14, 0.1, 0.14, '#ffd54a'), b(1.32, 0.9, 2.6, 0.1, 0.14, 0.14, 'a'), b(0.9, 1.32, 2.65, 0.14, 0.1, 0.14, '#ffd54a')],
+        glow: [[1.75, 0.5, 1.0, '#ffd27a', 0.7], [0.6, 1.75, 1.05, '#a8e0ff', 0.7], [1.55, 0.75, 1.9, '#ff9a8a', 0.6], [0.85, 1.55, 1.95, '#ffd27a', 0.6], [1.35, 0.95, 2.65, '#c8f7a8', 0.55], [0.9, 0.9, 3.85, '#ffd54a', 0.9]] },
+    gifts: { name: 'Подарки', cat: 'season', w: 1.6, d: 1.3, col: '#d9483b', parts: [b(0, 0, 0, 0.7, 0.6, 0.45, 'm'), b(0.28, 0, 0.45, 0.14, 0.6, 0.04, '#ffd54a'), b(0.8, 0.05, 0, 0.7, 0.7, 0.6, '#2f6b3a'), b(0.8, 0.36, 0.6, 0.7, 0.1, 0.04, '#f1ece4'), b(0.25, 0.7, 0, 0.55, 0.55, 0.38, '#2f3b5c'), b(0.25, 0.95, 0.38, 0.55, 0.08, 0.04, '#ffd54a')] },
+    pumpkins: { name: 'Тыквы', cat: 'season', w: 1.8, d: 1.4, col: '#e07a2e', parts: [b(0, 0.2, 0, 0.95, 0.95, 0.62, 'm'), b(0.42, 0.62, 0.62, 0.1, 0.1, 0.16, '#5b4a2b'), b(1.05, 0.3, 0, 0.65, 0.65, 0.45, 'm2'), b(1.33, 0.58, 0.45, 0.08, 0.08, 0.12, '#5b4a2b'), b(1.2, 1.0, 0, 0.42, 0.32, 0.3, 'm3'),
+        b(0.15, 1.15, 0.32, 0.16, 0.02, 0.12, '#3b2a14'), b(0.6, 1.15, 0.32, 0.16, 0.02, 0.12, '#3b2a14'), b(0.25, 1.15, 0.12, 0.45, 0.02, 0.1, '#3b2a14')], glow: [[0.47, 1.17, 0.3, '#ffb347', 1.4]] },
+    wreath: { name: 'Венок', cat: 'season', wall: true, len: 1.2, z: 3.0, col: '#2f6b3a', acc: '#d9483b', parts: [b(0, 0, 0.95, 1.2, 0.14, 0.25, 'm'), b(0, 0, 0, 1.2, 0.14, 0.25, 'm'), b(0, 0, 0.25, 0.25, 0.14, 0.7, 'm'), b(0.95, 0, 0.25, 0.25, 0.14, 0.7, 'm'), b(0.42, 0.14, 0.02, 0.36, 0.06, 0.22, 'a'), b(0.2, 0.14, 0.9, 0.1, 0.05, 0.1, '#d9483b'), b(0.9, 0.14, 0.92, 0.1, 0.05, 0.1, '#d9483b')] },
+    stockings: { name: 'Носки для подарков', cat: 'season', wall: true, len: 2, z: 2.2, col: '#d9483b', parts: [b(0, 0, 1.05, 2, 0.06, 0.06, '#7a4b2a'), b(0.15, 0.04, 0.25, 0.32, 0.1, 0.8, 'm'), b(0.15, 0.04, 0.1, 0.5, 0.1, 0.22, 'm'), b(0.13, 0.06, 0.85, 0.36, 0.1, 0.18, '#f1ece4'), b(0.8, 0.04, 0.25, 0.32, 0.1, 0.8, '#2f6b3a'), b(0.8, 0.04, 0.1, 0.5, 0.1, 0.22, '#2f6b3a'), b(0.78, 0.06, 0.85, 0.36, 0.1, 0.18, '#f1ece4'), b(1.45, 0.04, 0.45, 0.24, 0.1, 0.6, '#f1ece4'), b(1.45, 0.04, 0.35, 0.38, 0.1, 0.18, '#f1ece4'), b(1.43, 0.06, 0.88, 0.28, 0.1, 0.14, '#d9483b')] },
+    hearts: { name: 'Сердечки', cat: 'season', wall: true, len: 3.6, z: 4.4, col: '#e0506a', parts: hearts(3.6) },
+    bunting: { name: 'Флажки', cat: 'season', wall: true, len: 4.2, z: 4.6, col: '#c0392b', parts: bunting(4.2) },
+    balloons: { name: 'Шарики', cat: 'season', w: 1.2, d: 1.2, col: '#e0506a', parts: [b(0.45, 0.45, 0, 0.3, 0.3, 0.15, '#9aa0a6'), b(0.58, 0.58, 0.15, 0.03, 0.03, 2.5, '#e8e8e8'), b(0.15, 0.25, 2.5, 0.55, 0.55, 0.65, 'm'), b(0.55, 0.55, 2.9, 0.55, 0.55, 0.65, '#ffd166'), b(0.25, 0.65, 3.35, 0.5, 0.5, 0.6, '#7bdff2')] },
+    vase: { name: 'Ваза с цветами', cat: 'season', w: 0.8, d: 0.8, col: '#e9dcc3', acc: '#d99aa5', parts: [b(0.2, 0.2, 0, 0.4, 0.4, 0.9, 'm'), b(0.05, 0.05, 0.9, 0.7, 0.7, 0.55, 'a'), b(0.2, 0.2, 1.45, 0.4, 0.4, 0.25, 'a')] },
+    // ── 1943: палатка ──
+    cot: { name: 'Раскладушка', cat: 'camp', w: 2, d: 4.2, col: '#6b6b3a', acc: '#525a36', top: 0.96, parts: [...legs(2, 4.2, 0.7, '#5b4a2b', 0.1), b(0, 0, 0.7, 2, 4.2, 0.12, 'm'), b(0.05, 1.2, 0.82, 1.9, 2.9, 0.14, 'a'), b(0.3, 0.2, 0.82, 1.4, 0.8, 0.22, '#d8d0bc')] },
+    footlocker: { name: 'Сундук', cat: 'camp', w: 2, d: 1, col: '#4f5a3a', top: 1.02, parts: [b(0, 0, 0, 2, 1, 0.9, 'm'), b(-0.03, -0.03, 0.9, 2.06, 1.06, 0.12, 'm2'), b(0.4, 1.03, 0.6, 0.15, 0.03, 0.2, '#c9b26a'), b(1.45, 1.03, 0.6, 0.15, 0.03, 0.2, '#c9b26a')] },
+    fielddesk: { name: 'Стол из ящиков', cat: 'camp', w: 3, d: 1.6, col: '#8a7148', top: 1.43, parts: [b(0, 0, 0, 0.9, 1.6, 1.3, 'm'), b(2.1, 0, 0, 0.9, 1.6, 1.3, 'm'), b(-0.05, -0.05, 1.3, 3.1, 1.7, 0.12, 'm3'), b(0.6, 0.3, 1.42, 1.6, 1.1, 0.01, '#e8dcb5'), b(0.95, 0.45, 1.43, 0.5, 0.3, 0.005, '#8aa26b')] },
+    campchair: { name: 'Складной стул', cat: 'camp', w: 1, d: 1, col: '#6b6b3a', top: 0.88, parts: [...legs(1, 1, 0.8, '#5b4a2b', 0.08), b(0, 0, 0.8, 1, 1, 0.08, 'm'), b(0, 0, 0.88, 1, 0.08, 0.9, 'm')] },
+    stove40: { name: 'Буржуйка', cat: 'camp', w: 1.1, d: 1.1, col: '#2b2b2b', top: 1.18, parts: [b(0.1, 0.1, 0, 0.9, 0.9, 1.1, 'm'), b(0.05, 0.05, 1.1, 1, 1, 0.08, '#3a3a3a'), b(0.3, 1.0, 0.25, 0.5, 0.03, 0.4, '#5a2a14'), b(0.42, 0.42, 1.18, 0.26, 0.26, 4.6, '#3a3a3a')], glow: [[0.55, 1.05, 0.45, '#ff8a3d', 1.8, 'always']] },
+    lantern: { name: 'Лампа на ящике', cat: 'camp', w: 1, d: 1, col: '#8a7148', top: 1.0, parts: [b(0.1, 0.1, 0, 0.8, 0.8, 1.0, 'm'), b(0.3, 0.3, 1.0, 0.4, 0.4, 0.12, '#7a5a2a'), b(0.33, 0.33, 1.12, 0.34, 0.34, 0.45, 'rgba(255,220,150,.55)'), b(0.3, 0.3, 1.57, 0.4, 0.4, 0.08, '#7a5a2a')], glow: [[0.5, 0.5, 1.35, '#ffcf7a', 3.0]] },
+    fieldradio: { name: 'Рация', cat: 'camp', w: 1.4, d: 1, col: '#4f5a3a', top: 1.6, parts: [b(0, 0, 0, 1.4, 1, 0.9, '#8a7148'), b(0.1, 0.1, 0.9, 1.2, 0.8, 0.7, 'm'), b(0.2, 0.9, 1.0, 1.0, 0.02, 0.5, '#2b2f22'), b(0.35, 0.92, 1.25, 0.15, 0.02, 0.15, '#d8d0bc'), b(0.75, 0.92, 1.25, 0.15, 0.02, 0.15, '#d8d0bc'), b(1.15, 0.2, 1.6, 0.04, 0.04, 1.8, '#2b2b2b')] },
+    ammo: { name: 'Ящики', cat: 'camp', w: 2, d: 1.2, col: '#5d6b3a', parts: [b(0, 0, 0, 1.2, 1.2, 0.7, 'm'), b(0.15, 0.1, 0.7, 0.9, 1.0, 0.5, 'm2'), b(1.25, 0.2, 0, 0.75, 0.9, 0.5, 'm3')] },
+    dogbed40: { name: 'Подстилка Фрица', cat: 'camp', w: 1.6, d: 1.2, flat: true, col: '#6b5a3a', top: 0.12, parts: [b(0, 0, 0, 1.6, 1.2, 0.1, 'm'), b(0.2, 0.2, 0.1, 1.2, 0.8, 0.02, 'm3')] },
+    mapboard: { name: 'Карта на доске', cat: 'camp', wall: true, len: 2.4, z: 2.4, col: '#d9c9a0', parts: [b(0, 0, 0, 2.4, 0.06, 1.6, 'm'), b(0.3, 0.06, 0.3, 0.8, 0.01, 0.5, '#8aa26b'), b(1.2, 0.06, 0.8, 0.7, 0.01, 0.4, '#c78b5a'), b(0.5, 0.07, 1.2, 0.06, 0.04, 0.06, '#d9483b'), b(1.7, 0.07, 0.5, 0.06, 0.04, 0.06, '#d9483b')] },
+    tentflap: { name: 'Полог', cat: 'camp', wall: true, len: 2, z: 0, col: '#6b6b3a', parts: [b(0.2, 0, 0, 1.6, 0.04, 3, 'sky'), b(0, 0, 0, 0.3, 0.15, 3.2, 'm'), b(1.7, 0, 0, 0.3, 0.15, 3.2, 'm'), b(0.1, 0.15, 1.8, 0.1, 0.05, 0.1, '#c9b26a')] },
+    coathook: { name: 'Шинель на крюке', cat: 'camp', wall: true, len: 0.9, z: 1.6, col: '#4f5a3a', parts: [b(0.4, 0, 2.2, 0.1, 0.15, 0.1, '#3a3a3a'), b(0.1, 0.05, 0, 0.7, 0.2, 2.2, 'm')] },
+    // ── 2013: Адская кухня ──
+    mattress: { name: 'Матрас', cat: 'cheap', w: 3.2, d: 4.4, col: '#cfc6b8', acc: '#6b7f8e', top: 0.51, parts: [b(0, 0, 0, 3.2, 4.4, 0.45, 'm'), b(0.05, 1.4, 0.45, 3.1, 2.9, 0.06, 'a'), b(0.4, 0.2, 0.45, 2.4, 0.9, 0.25, '#e8e2d6')] },
+    minifridge: { name: 'Мини-холодильник', cat: 'cheap', w: 1.1, d: 1.1, col: '#e8e4da', top: 1.7, parts: [b(0, 0, 0, 1.1, 1.1, 1.7, 'm'), b(0.05, 1.1, 0.1, 1.0, 0.03, 1.5, 'm3'), b(0.85, 1.13, 0.7, 0.06, 0.04, 0.5, '#9aa0a6')] },
+    hotplate: { name: 'Тумба с плиткой', cat: 'cheap', w: 1.6, d: 1, col: '#b5a48a', top: 1.52, parts: [b(0, 0, 0, 1.6, 1, 1.4, 'm'), b(0.1, 1.0, 0.1, 1.4, 0.03, 1.1, 'm3'), b(0.2, 0.2, 1.4, 1.0, 0.6, 0.12, '#2f2f31'), b(0.3, 0.3, 1.52, 0.35, 0.35, 0.02, '#58585c'), b(0.75, 0.3, 1.52, 0.35, 0.35, 0.02, '#58585c')] },
+    bottles: { name: 'Бутылки', cat: 'cheap', w: 1, d: 0.8, col: '#3f6b3a', parts: [b(0.05, 0.1, 0, 0.22, 0.22, 0.75, 'm'), b(0.11, 0.16, 0.75, 0.1, 0.1, 0.22, 'm'), b(0.35, 0.3, 0, 0.22, 0.22, 0.85, '#6b3a2a'), b(0.41, 0.36, 0.85, 0.1, 0.1, 0.2, '#6b3a2a'), b(0.65, 0.1, 0, 0.22, 0.22, 0.7, 'rgba(200,220,230,.6)')] },
+    ball: { name: 'Мячик', cat: 'cheap', w: 0.5, d: 0.5, col: '#d9483b', parts: [b(0.1, 0.1, 0, 0.3, 0.3, 0.3, 'm')] },
+    cardboard: { name: 'Коробки', cat: 'cheap', w: 1.8, d: 1.2, col: '#b88a55', parts: [b(0, 0, 0, 1.2, 1.2, 0.8, 'm'), b(0.2, 0.1, 0.8, 0.9, 0.9, 0.6, 'm3'), b(1.25, 0.3, 0, 0.55, 0.8, 0.5, 'm2')] },
+    techtable: { name: 'Стол с железом', cat: 'cheap', w: 2.6, d: 1.4, col: '#6b5a4a', top: 1.5, parts: [...legs(2.6, 1.4, 1.4, '#3a3a3a', 0.1), b(0, 0, 1.4, 2.6, 1.4, 0.1, 'm'), b(0.3, 0.3, 1.5, 0.9, 0.6, 0.05, '#2b2b2e'), b(0.3, 0.25, 1.55, 0.9, 0.05, 0.6, '#2f4d6b'), b(1.5, 0.4, 1.5, 0.6, 0.5, 0.15, '#7a8a6a'), b(1.6, 0.95, 1.5, 0.4, 0.3, 0.25, '#9e3b34')], glow: [[0.75, 0.3, 1.85, '#6fb8ff', 1.5, 'always']] },
+    // ── 2014: Бруклин ──
+    neurolab: { name: 'Стол-лаба', cat: 'kitchen', w: 3, d: 2, col: '#b5835a', top: 1.58, parts: [...legs(3, 2, 1.4), b(0, 0, 1.4, 3, 2, 0.18, 'm'), b(0.6, 0.5, 1.58, 1.2, 0.8, 0.45, '#5a6b7d'), b(1.95, 0.6, 1.58, 0.6, 0.6, 0.25, '#c0c8d0'), b(0.2, 1.4, 1.58, 2.4, 0.05, 0.03, '#2b2b2b')], glow: [[1.2, 0.9, 2.05, '#7fd8ff', 1.1, 'always']] },
+    railing: { name: 'Перила', cat: 'garden', w: 5, d: 0.3, col: '#2b2b2e', parts: rail(5) },
+    ladder: { name: 'Лестница', cat: 'wall', wall: true, len: 1.2, z: 0, col: '#2b2b2e', parts: [b(0, 0, 0, 0.1, 0.12, 5.6, 'm'), b(1.1, 0, 0, 0.1, 0.12, 5.6, 'm'), ...rungs()] },
+    milkcrate: { name: 'Ящик-сиденье', cat: 'seat', w: 1, d: 1, col: '#2f5d8a', top: 0.82, parts: [b(0, 0, 0, 1, 1, 0.8, 'm'), b(0.05, 0.05, 0.8, 0.9, 0.9, 0.02, 'm2')] },
+    ashtray: { name: 'Пепельница', cat: 'decor', w: 0.8, d: 0.8, col: '#8b8f96', parts: [b(0.15, 0.15, 0, 0.5, 0.5, 0.15, 'm'), b(0.3, 0.35, 0.15, 0.22, 0.05, 0.04, '#f1ece4')] },
+    // ── 2017: трейлер и сарай ──
+    calctable: { name: 'Стол под расчётами', cat: 'camp', w: 3, d: 1.6, col: '#7a5a3c', top: 1.54, parts: [...legs(3, 1.6, 1.4), b(0, 0, 1.4, 3, 1.6, 0.14, 'm'), b(0.15, 0.15, 1.54, 1.0, 0.8, 0.12, '#f1ece4'), b(0.3, 0.95, 1.54, 0.8, 0.5, 0.06, '#e9e2d4'), b(1.3, 0.2, 1.54, 0.9, 0.6, 0.05, '#2b2b2e'), b(1.3, 0.15, 1.59, 0.9, 0.05, 0.55, '#2f4d6b'), b(2.5, 0.9, 1.54, 0.25, 0.25, 0.3, '#7a4b2a'), b(2.5, 0.3, 1.54, 0.2, 0.2, 0.6, '#3f6b3a')], glow: [[1.75, 0.2, 1.85, '#6fd8ff', 1.3, 'always']] },
+    foilwin: { name: 'Окно в фольге', cat: 'wall', wall: true, len: 2.6, z: 1.5, col: '#e9e2d4', surf: [-0.15, 2.75, 0.6], top: 0.15, parts: [b(-0.15, 0, 0, 2.9, 0.6, 0.15, 'm'), b(0.18, 0, 0.33, 2.24, 0.04, 2.69, '#c9ccd1'), b(0.5, 0.04, 1.0, 1.6, 0.01, 0.05, '#aeb3b9'), b(0.7, 0.04, 2.0, 1.2, 0.01, 0.05, '#aeb3b9'), b(0, 0, 0.15, 0.18, 0.12, 3.05, 'm'), b(2.42, 0, 0.15, 0.18, 0.12, 3.05, 'm'), b(0.18, 0, 0.15, 2.24, 0.12, 0.18, 'm'), b(0.18, 0, 3.02, 2.24, 0.12, 0.18, 'm')] },
+    shipnose: { name: 'Корабль под брезентом', cat: 'ship', w: 6, d: 7, col: '#55624f', parts: [b(1, 1, 0, 0.4, 0.4, 0.4, '#3a3a3a'), b(4.6, 1, 0, 0.4, 0.4, 0.4, '#3a3a3a'), b(2.8, 5.5, 0, 0.4, 0.4, 0.6, '#3a3a3a'), b(0.5, 0, 0.4, 5, 6.5, 1.6, 'm'), b(0, 1, 0.6, 0.5, 2.5, 0.3, 'm3'), b(5.5, 1, 0.6, 0.5, 2.5, 0.3, 'm3'), b(1.5, 6.5, 0.6, 3, 0.5, 1.0, 'm2'), b(1.8, 4.5, 2.0, 2.4, 1.6, 0.6, 'rgba(140,200,230,.55)')] },
+    generator: { name: 'Генератор', cat: 'ship', w: 1.4, d: 1, col: '#c9a227', parts: [b(0, 0, 0, 1.4, 1, 0.95, 'm'), b(0.1, 0.1, 0.95, 0.4, 0.3, 0.25, '#3a3a3a'), b(0.7, 1.0, 0.3, 0.5, 0.02, 0.4, '#3a3a3a')] },
+    // ── «Скиталец» ──
+    bunk: { name: 'Койка', cat: 'ship', w: 4, d: 2, col: '#5c6470', acc: '#4a2747', top: 1.09, parts: [b(0, 0, 0, 4, 2, 0.75, 'm2'), b(0.05, 0.05, 0.75, 3.9, 1.9, 0.22, '#d8d0bc'), b(0.1, 0.15, 0.97, 0.8, 1.7, 0.2, '#f1ece4'), b(1.0, 0.05, 0.97, 2.95, 1.9, 0.12, 'a')] },
+    porthole: { name: 'Иллюминатор', cat: 'ship', wall: true, len: 1.4, z: 2.2, col: '#8b8f96', parts: [b(0.2, 0, 0.2, 1.0, 0.04, 1.0, 'space'), b(0, 0, 0, 1.4, 0.16, 0.2, 'm'), b(0, 0, 1.2, 1.4, 0.16, 0.2, 'm'), b(0, 0, 0.2, 0.2, 0.16, 1.0, 'm'), b(1.2, 0, 0.2, 0.2, 0.16, 1.0, 'm')] },
+    viewport: { name: 'Обзорное окно', cat: 'ship', wall: true, len: 5.6, z: 1.8, col: '#6b717a', parts: [b(0.22, 0, 0.22, 2.47, 0.04, 2.38, 'space'), b(2.91, 0, 0.22, 2.47, 0.04, 2.38, 'space'), b(0, 0, 0, 5.6, 0.18, 0.22, 'm'), b(0, 0, 2.6, 5.6, 0.18, 0.22, 'm'), b(0, 0, 0.22, 0.22, 0.18, 2.38, 'm'), b(5.38, 0, 0.22, 0.22, 0.18, 2.38, 'm'), b(2.69, 0, 0.22, 0.22, 0.18, 2.38, 'm')] },
+    console: { name: 'Пульт', cat: 'ship', w: 4, d: 1.6, col: '#3b3d42', top: 1.5, parts: [b(0, 0, 0, 4, 1.6, 1.2, 'm'), b(0, 0.2, 1.2, 4, 1.2, 0.3, 'm2'), b(0.4, 0.3, 1.5, 1.2, 0.9, 0.03, 'rgba(110,215,255,.6)'), b(2.4, 0.3, 1.5, 1.2, 0.9, 0.03, 'rgba(159,227,184,.6)')], glow: [[1.0, 0.8, 1.55, '#6fd8ff', 1.6, 'always'], [3.0, 0.8, 1.55, '#9fe3b8', 1.4, 'always']] },
+    pilotseat: { name: 'Кресло пилота', cat: 'ship', w: 1.4, d: 1.4, col: '#3b3d42', top: 0.9, parts: [b(0.5, 0.5, 0, 0.4, 0.4, 0.6, '#2a2a2c'), b(0, 0, 0.6, 1.4, 1.4, 0.3, 'm'), b(0, 0, 0.9, 1.4, 0.3, 1.4, 'm')] },
+    galley: { name: 'Камбуз', cat: 'ship', w: 3, d: 1.2, col: '#8b8f96', top: 1.6, parts: [b(0, 0, 0, 3, 1.2, 1.5, 'm'), b(0.1, 1.2, 0.12, 1.35, 0.03, 1.25, 'm3'), b(0, 0, 1.5, 3, 1.25, 0.1, '#c7cdd2'), b(2.2, 0.2, 1.6, 0.6, 0.6, 0.7, '#2b2b2e'), b(0.4, 0.3, 1.6, 0.9, 0.6, 0.02, '#9aa3ad')] },
+    cargo: { name: 'Контейнеры', cat: 'ship', w: 3.8, d: 2, col: '#5a6b7d', parts: [b(0, 0, 0, 2, 2, 1.6, 'm'), b(2.1, 0.2, 0, 1.6, 1.8, 1.2, 'm2'), b(0.3, 0.2, 1.6, 1.4, 1.6, 1.0, 'm3'), b(0, 0.9, 0.6, 2, 0.04, 0.1, '#c9a227'), b(2.1, 1.0, 0.5, 1.6, 0.04, 0.1, '#c9a227')] },
+    pipes: { name: 'Трубы', cat: 'ship', wall: true, len: 5, z: 4.6, col: '#8b8f96', parts: [b(0, 0, 0, 5, 0.25, 0.25, 'm'), b(0, 0, 0.4, 5, 0.2, 0.2, 'm2'), b(1.4, 0, -0.2, 0.3, 0.3, 0.9, 'm3')] },
     toolswall: { name: 'Стена инструментов', cat: 'garage', wall: true, len: 3, z: 1.9, col: '#c9a46b', parts: [b(0, 0, 0, 3, 0.08, 2, 'm'), b(0.3, 0.08, 0.3, 0.15, 0.06, 1.2, '#7f8a94'), b(0.7, 0.08, 0.6, 0.5, 0.06, 0.15, '#c0392b'), b(1.4, 0.08, 0.2, 0.12, 0.06, 1.4, '#7f8a94'), b(1.8, 0.08, 0.9, 0.7, 0.06, 0.5, '#3d6e9e'), b(2.6, 0.08, 0.4, 0.12, 0.06, 1.1, '#d4a13c')] },
 };
 export const furnById = (t) => FURN[t] || null;
-export const FURN_CATS = [['seat', 'Сидеть'], ['sleep', 'Спать'], ['table', 'Столы'], ['store', 'Хранение'], ['kitchen', 'Кухня'], ['kids', 'Детская'], ['light', 'Свет'], ['decor', 'Уют'], ['wall', 'На стену'], ['garden', 'Сад'], ['gym', 'Зал'], ['lab', 'Лаба'], ['garage', 'Гараж'], ['shop', 'Лавка']];
+export const FURN_CATS = [['seat', 'Сидеть'], ['sleep', 'Спать'], ['table', 'Столы'], ['store', 'Хранение'], ['kitchen', 'Кухня'], ['kids', 'Детская'], ['light', 'Свет'], ['decor', 'Уют'], ['wall', 'На стену'], ['garden', 'Сад'], ['gym', 'Зал'], ['lab', 'Лаба'], ['garage', 'Гараж'], ['shop', 'Лавка'], ['season', 'Праздники'], ['camp', 'Походное'], ['cheap', 'Съёмное'], ['ship', 'Корабль']];
 
 /** Раскладки комнат по лору. Напольное: [тип, x, y, поворот]; настенное: [тип, 'L'|'R', вдоль, высота?]. */
 export const LAYOUT = {
@@ -206,6 +298,30 @@ export const LAYOUT = {
     lab: { wall: 'brick', floor: 'concrete', furn: [['workbench', 0.6, 0, 0], ['workbench', 0, 2.2, 1], ['desk', 5.4, 0.2, 0], ['holo', 4.4, 4.4, 0], ['bot', 7.4, 6.2, 0], ['holoscreen', 'R', 5.6], ['toolswall', 'L', 6.6], ['wshelf', 'R', 0.8, 3.6]] },
     garage: { wall: 'brick', floor: 'concrete', furn: [['car', 1.2, 1.6, 0], ['moto', 7, 2.6, 0], ['workbench', 6.2, 0, 0], ['toolswall', 'R', 1, 1.9], ['wshelf', 'R', 5.6, 3.4]] },
     shop: { wall: 'wainscot', floor: 'checker', furn: [['pantry', 0.3, 0, 0], ['pantry', 3.1, 0, 0], ['radio', 6.4, 0.2, 0], ['shopcounter', 1.2, 5, 0], ['crates', 6.6, 6.4, 0], ['window', 'L', 2.2], ['clock', 'R', 8.4, 4.3]] },
+    // 1943 — палатка капитана
+    tent: { wall: 'canvas', floor: 'dirt', furn: [['dogbed40', 5.6, 6.6, 0], ['cot', 0.2, 0.6, 0], ['footlocker', 0.2, 5.0, 1], ['fielddesk', 4.2, 0.2, 0], ['campchair', 5.2, 2.1, 2], ['stove40', 8.4, 3.6, 0], ['lantern', 7.6, 0.4, 0], ['fieldradio', 2.6, 0.2, 0], ['ammo', 7.8, 8.4, 0], ['mapboard', 'R', 4.4, 2.6], ['tentflap', 'L', 7.6, 0], ['coathook', 'R', 1.2, 1.6]] },
+    workshop40: { wall: 'canvas', floor: 'dirt', furn: [['workbench', 0.6, 0, 0], ['workbench', 0, 2.2, 1], ['ammo', 6.6, 0.3, 0], ['lantern', 4.6, 0.3, 0], ['fieldradio', 7.4, 6.4, 0], ['mapboard', 'R', 5.4, 2.6], ['tentflap', 'L', 7.4, 0]] },
+    depot40: { wall: 'canvas', floor: 'dirt', furn: [['ammo', 0.3, 0.3, 0], ['ammo', 2.6, 0.3, 0], ['ammo', 0.3, 2.0, 1], ['cardboard', 6.4, 0.4, 0], ['ammo', 7.6, 7.8, 0], ['tentflap', 'L', 7.4, 0]] },
+    // 2013 — Адская кухня
+    hk_room: { wall: 'peel', wallR: 'drywall', floor: 'lino', furn: [['mattress', 0.3, 0.3, 0], ['techtable', 4.4, 0.2, 0], ['chair', 5.2, 1.8, 2], ['minifridge', 8.6, 0.2, 0], ['hotplate', 8.6, 1.6, 1], ['bottles', 3.8, 5.0, 0], ['cardboard', 0.3, 7.6, 1], ['ball', 5.6, 5.6, 0], ['window', 'L', 5.4]] },
+    // 2014 — Бруклин
+    bk_kitchen: { wall: 'wbrick', floor: 'planks', furn: [['counter', 0, 0, 0], ['stove', 3, 0, 0], ['sink', 4.4, 0, 0], ['fridge', 0, 1.4, 1], ['neurolab', 4, 4.4, 0], ['chair', 5, 3.2, 0], ['chair', 4.6, 6.6, 2], ['window', 'L', 5.0], ['clock', 'L', 2.2], ['wshelf', 'R', 7.6, 3.6]] },
+    bk_room: { wall: 'plaster', floor: 'planks', furn: [['rug', 2.6, 3.6, 0], ['bed', 5.8, 0, 0], ['sofa', 0, 3, 1], ['ctable', 2.6, 4.6, 1], ['bookcase', 0.4, 0, 0], ['lamp', 0.3, 8.0, 0], ['nightstand', 4.6, 0.1, 0], ['window', 'L', 7.2]] },
+    bk_fire: { wall: 'yard', wallR: 'brick', floor: 'grate', furn: [['railing', 0.1, 0.4, 1], ['railing', 0.1, 5.2, 1], ['plant', 8.4, 0.6, 0], ['milkcrate', 4.0, 3.0, 0], ['ashtray', 5.4, 3.2, 0], ['window', 'R', 3.0], ['ladder', 'R', 7.6]] },
+    // 2017 — трейлер, сарай
+    trailer: { wall: 'veneer', floor: 'vinyl', furn: [['cot', 0.2, 0.4, 0], ['stove40', 8.6, 2.6, 0], ['calctable', 3.8, 0.2, 0], ['campchair', 4.8, 2.0, 2], ['bottles', 7.2, 0.3, 0], ['cardboard', 0.3, 7.8, 1], ['lamp', 0.4, 5.4, 0], ['foilwin', 'R', 1.2], ['foilwin', 'L', 6.0], ['wshelf', 'R', 6.8, 3.8]] },
+    barn: { wall: 'planksv', floor: 'dirt', furn: [['shipnose', 1.5, 1.2, 0], ['workbench', 0.2, 6.2, 1], ['generator', 8.4, 8.4, 0], ['cardboard', 8.0, 0.3, 0], ['toolswall', 'R', 0.5, 1.9]] },
+    // «Скиталец»
+    cabin: { wall: 'hull', floor: 'deckplate', furn: [['bunk', 0, 0.2, 1], ['footlocker', 0.2, 4.6, 1], ['desk', 5.4, 0.2, 0], ['chair', 6.4, 1.9, 2], ['porthole', 'R', 2.6, 2.4], ['porthole', 'L', 7.2, 2.4], ['pipes', 'R', 0, 4.8], ['wshelf', 'L', 4.8, 3.6]] },
+    galley: { wall: 'hull', floor: 'deckplate', furn: [['galley', 0, 0, 0], ['fridge', 3.1, 0, 0], ['table', 4.4, 4.4, 0], ['chair', 5.4, 3.2, 0], ['chair', 4.8, 6.6, 2], ['porthole', 'L', 4.6, 2.4], ['pipes', 'R', 5, 4.8]] },
+    sbridge: { wall: 'hull', floor: 'deckplate', furn: [['console', 3, 0.3, 0], ['pilotseat', 3.6, 2.4, 2], ['pilotseat', 5.6, 2.4, 2], ['viewport', 'R', 2.2, 1.9], ['porthole', 'L', 4.0, 2.4]] },
+    hold: { wall: 'hull', floor: 'grate', furn: [['cargo', 0.4, 0.4, 0], ['cargo', 5.6, 0.4, 0], ['ammo', 0.5, 6.0, 0], ['generator', 7.8, 7.6, 0], ['pipes', 'R', 0, 4.8], ['pipes', 'L', 0, 4.8]] },
+    slab: { wall: 'hull', floor: 'deckplate', furn: [['workbench', 0.6, 0, 0], ['holo', 4.4, 4.4, 0], ['bot', 7.4, 6.2, 0], ['holoscreen', 'R', 5.6], ['porthole', 'L', 3.0, 2.4]] },
+    // 2018 — квартира с Наташей
+    n_kitchen: { wall: 'wbrick', floor: 'planks', furn: [['counter', 0, 0, 0], ['stove', 3, 0, 0], ['sink', 4.4, 0, 0], ['fridge', 0, 1.4, 1], ['table', 4, 4.6, 0], ['chair', 5, 3.4, 0], ['chair', 4.3, 6.8, 2], ['chair', 5.7, 6.8, 2], ['window', 'L', 4.6], ['clock', 'L', 1.6], ['wshelf', 'R', 7.6, 3.6]] },
+    n_living: { wall: 'plaster', floor: 'herring', furn: [['rug', 2.4, 3.4, 1], ['sofa', 0, 3, 1], ['ctable', 2.8, 4.6, 1], ['armchair', 6, 5.2, 3], ['bookcase', 0.4, 0, 0], ['lamp', 0.3, 8, 0], ['plant', 8.6, 0.3, 0], ['window', 'R', 5.6]] },
+    n_hedy: { wall: 'eggplant', floor: 'planks', furn: [['rug', 3.2, 5.6, 0], ['bed', 3, 0, 0], ['nightlamp', 1.8, 0.1, 0], ['desk', 0.2, 6.2, 1], ['bottles', 8.4, 0.3, 0], ['window', 'L', 1.8], ['wshelf', 'R', 7.6, 3.6]] },
+    n_nat: { wall: 'sage', floor: 'planks', furn: [['rug', 3.2, 5.6, 0], ['bed', 3, 0, 0], ['nightstand', 7.2, 0.1, 0], ['dresser', 0, 6.2, 1], ['window', 'L', 1.8], ['mirror', 'L', 4.7]] },
 };
 
 /** Вещи как наклейки: высота в единицах комнаты и плоская ли (фото — плоское, на стену). */

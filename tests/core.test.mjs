@@ -89,9 +89,12 @@ assert.ok(C.roomImg('kitchen'));
 assert.match(drawn[drawn.length - 1].prompt, /present day, 2024/);
 date = '10.03.1944';
 assert.equal(C.eraKey(), '40s');
-assert.equal(C.roomImg('kitchen'), '', 'в 1944 кухня другая — не нарисована');
-await C.drawRoom(D.roomById('kitchen'));
+assert.equal(C.homeId(), '1943', 'в 1944 — палатка капитана');
+assert.equal(D.roomById('kitchen'), null, 'кухни 2024-го в сороковых нет');
+assert.equal(C.roomImg('tent'), '', 'палатку ещё не рисовали');
+await C.drawRoom(D.roomById('tent'));
 assert.match(drawn[drawn.length - 1].prompt, /1940s/);
+assert.match(drawn[drawn.length - 1].prompt, /wall tent.*Captain Theodora/s);
 assert.match(C.eraLine(), /1940-е/);
 
 // 8. похожесть
