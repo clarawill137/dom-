@@ -11,7 +11,7 @@ export function setApi(a) { A = a; }
 
 const ctx = () => SillyTavern.getContext();
 export const MODULE = 'dom';
-export const VERSION = '0.3.2';
+export const VERSION = '0.4.0';
 
 // ───────────── мелочи ─────────────
 

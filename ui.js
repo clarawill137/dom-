@@ -4,12 +4,13 @@
 import * as C from './core.js';
 import * as D from './data.js';
 import * as Doll from './doll.js';
+import * as Cz from './cozy.js';
 
 const esc = C.esc;
 const ui = {
     view: 'home', room: '', modal: null, busy: new Set(),
     gen: { who: null, vibe: 'dice', ask: '', rolling: false, flash: [], rolls: [], batch: '' },
-    shop: { cat: 'decor', ask: '' }, inv: { f: 'all' }, shelf: { ask: '' },
+    shop: { cat: 'decor', ask: '' }, inv: { f: 'all' }, shelf: { ask: '' }, roll: { f: 'all', sel: '', ask: '' },
 };
 
 // ───────────── значки ─────────────
@@ -145,7 +146,9 @@ function homeHtml() {
             <button data-dm="shop">${ic('bag')}<span>Покупки</span></button>
             <button data-dm="inv">${ic('box')}<span>Вещи${inv ? ` · ${inv}` : ''}</span></button>
             <button data-dm="sugg" class="${sg ? 'hot' : ''}">${ic('bell')}<span>Из постов${sg ? ` · ${sg}` : ''}</span></button>
+            <button data-dm="roll">${ic('frame')}<span>Плёнка${Cz.roll().length ? ` · ${Cz.roll().length}` : ''}</span></button>
         </div>
+        ${Cz.snowCard()}
         <div class="dm-sec"><span>Дом</span><em>${D.ROOMS.some(r => !C.roomImg(r.id)) ? `<button class="dm-mini" data-dm="drawHouse">${busy('house') ? spin : `${ic('brush')} нарисовать весь дом`}</button>` : 'кирпич, довоенный, над лавкой Марко'}</em></div>
         <div class="dm-house"><i class="dm-roof"></i>${floors}</div>
         <div class="dm-hint">Тап по комнате — зайти: полки, вещи, картинки. Лаборатория, зал и гараж — мостики в Ангар.</div>`;
@@ -229,7 +232,7 @@ function paintModal() {
     if (!ui.modal) { box.classList.remove('on'); box.innerHTML = ''; return; }
     const top = box.querySelector('.dm-sheet')?.scrollTop || 0;
     let html = '';
-    try { html = { gen: genSheet, hc: hcSheet, zoom: zoomSheet, shelf: shelfSheet, item: itemSheet, shop: shopSheet, inv: invSheet, sugg: suggSheet, place: placeSheet, form: formSheet, pick: pickSheet, dlWall: () => Doll.wallSheet(sheetHead), dlFloor: () => Doll.floorSheet(sheetHead), dlFurn: () => Doll.furnSheet(sheetHead) }[ui.modal.kind]?.() || ''; } catch (err) { console.error('[Дом] лист', err); html = `<div class="dm-sheet">${sheetHead('Ой')}<div class="dm-empty">${esc(err?.message || err)}</div></div>`; }
+    try { html = { gen: genSheet, hc: hcSheet, zoom: zoomSheet, shelf: shelfSheet, item: itemSheet, shop: shopSheet, inv: invSheet, sugg: suggSheet, place: placeSheet, form: formSheet, pick: pickSheet, dlWall: () => Doll.wallSheet(sheetHead), dlFloor: () => Doll.floorSheet(sheetHead), dlFurn: () => Doll.furnSheet(sheetHead), roll: () => Cz.rollSheet({ head: sheetHead, btn, busy, spin, ic, ui }) }[ui.modal.kind]?.() || ''; } catch (err) { console.error('[Дом] лист', err); html = `<div class="dm-sheet">${sheetHead('Ой')}<div class="dm-empty">${esc(err?.message || err)}</div></div>`; }
     box.innerHTML = html;
     box.classList.add('on');
     const s = box.querySelector('.dm-sheet'); if (s) s.scrollTop = top;
@@ -637,6 +640,17 @@ const HANDLERS = {
     formSave: async () => { const f = ui.modal; const r = await f.onSave(formVals()); if (r === false) { C.toast('info', 'Заполни главное'); return; } if (r !== 'keep' && ui.modal === f) closeModal(); else render(); },
 };
 
+Object.assign(HANDLERS, {
+    roll: () => { ui.roll.sel = ''; modal('roll'); },
+    rollF: (el) => { ui.roll.f = el.dataset.v; paintModal(); },
+    rollSel: (el) => { ui.roll.sel = ui.roll.sel === el.dataset.v ? '' : el.dataset.v; paintModal(); },
+    rollSnap: (el) => { const k = el.dataset.v; if (k === 'own' && !ui.roll.ask.trim()) { C.toast('info', 'Опиши кадр'); return; } withBusy(`roll:${k}`, async () => { const x = await Cz.snap(k, k === 'own' ? ui.roll.ask : ''); ui.roll.sel = x.id; if (k === 'own') ui.roll.ask = ''; }); },
+    rollShow: (el) => { if (Cz.show(el.dataset.v)) C.toast('success', 'Покажет в следующем ответе'); },
+    rollPrint: (el) => { const it = Cz.print(el.dataset.v); if (it) C.toast('success', 'Фото в рамке — в гостиной'); paintModal(); render(); },
+    rollDrop: (el) => { Cz.drop(el.dataset.v); ui.roll.sel = ''; paintModal(); render(); },
+    rollChat: () => { const n = Cz.fromChat(); C.toast(n ? 'success' : 'info', n ? `Из чата: ${n}` : 'Новых картинок в чате нет'); paintModal(); render(); },
+    snowScene: (el) => { if (Cz.snowScene(el.dataset.v)) C.toast('success', 'Уютная сцена — в следующий ответ'); },
+});
 Object.assign(HANDLERS, Doll.handlers({ render: () => render(), modal, closeModal, paintModal: () => paintModal(), withBusy }));
 Doll.bind({ render: () => render(), modal, closeModal, paintModal: () => paintModal(), withBusy, busy: (k) => ui.busy.has(k) });
 
@@ -658,6 +672,7 @@ export function onChange(e) {
     else if (f === 'shop:ask') ui.shop.ask = el.value;
     else if (f === 'shelf:ask') ui.shelf.ask = el.value;
     else if (f.startsWith('dl:')) Doll.onField(f, el.value);
+    else if (f === 'roll:ask') ui.roll.ask = el.value;
     else if (f === 'cfg:autoDraw') { C.cfg().autoDraw = !!el.checked; C.saveCfg(); }
     else if (f.startsWith('it:')) {
         const it = C.itemById(el.dataset.id); if (!it) return;
@@ -677,6 +692,7 @@ export function onInput(e) {
     if (f === 'shop:ask') ui.shop.ask = e.target.value;
     if (f === 'shelf:ask') ui.shelf.ask = e.target.value;
     if (f?.startsWith?.('dl:')) Doll.onField(f, e.target.value);
+    if (f === 'roll:ask') ui.roll.ask = e.target.value;
 }
 async function upload(el) {
     const file = el.files?.[0];

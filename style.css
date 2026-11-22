@@ -316,3 +316,20 @@
 .dl-fcard { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; border-radius: 14px; background: var(--panel2) !important; border: 1px solid var(--line) !important; text-align: center !important; }
 .dl-fcard svg { width: 100%; height: 62px; }
 .dl-fcard small { font-size: 11px; color: var(--dim); line-height: 1.15; }
+
+/* ───────────── 0.4 · Фотоплёнка и Снежный день ───────────── */
+.dm-snow { margin: 0 0 14px; padding: 12px 14px; border-radius: 18px; background: radial-gradient(120% 120% at 0% 0%, rgba(200, 225, 255, .22), transparent 60%), var(--panel); border: 1px solid rgba(200, 225, 255, .3); }
+.dm-snow b { display: block; font-size: 16px; }
+.dm-snow small { display: block; color: var(--dim); font-size: 12px; margin: 2px 0 8px; }
+.dm-snow-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.dm-snow-list button { padding: 7px 11px; border-radius: 99px; background: rgba(200, 225, 255, .12) !important; border: 1px solid rgba(200, 225, 255, .3) !important; font-size: 13px; }
+.dm-roll { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin: 10px 0; border-radius: 12px; overflow: hidden; }
+.dm-roll-i { aspect-ratio: 1; padding: 0 !important; display: block; }
+.dm-roll-i img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dm-roll-i.on { outline: 2px solid var(--acc); outline-offset: -2px; }
+.dm-roll-big { margin: 10px 0; text-align: center; }
+.dm-roll-big img { max-width: 100%; max-height: 52vh; border-radius: 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); }
+.dm-roll-big p { margin: 8px 0 0; font-size: 15px; }
+.dm-roll-big small { color: var(--dim); }
+.dm-quick { grid-template-columns: repeat(4, 1fr) !important; }
+.dm-quick button span { font-size: 12.5px; }
