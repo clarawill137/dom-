@@ -98,4 +98,92 @@ assert.match(C.eraLine(), /1940-е/);
 assert.ok(C.isDup('Баки всегда садится лицом к двери, даже дома', ['Баки дома всегда садится лицом к двери']));
 assert.ok(!C.isDup('Хеди прячет конфеты в ящике с отвёртками', ['Баки всегда садится лицом к двери']));
 
+// 9. полки: придумать — заделы и повторы не проходят, комната по полке
+date = '21.11.2024';
+api.askDeepJson = async (msgs, tokens, o) => { asked = { msgs, tokens, o, story: null }; return JSON.parse(JSON.stringify(reply)); };
+reply = { items: [
+    { name: 'Сэр Кракен', desc: 'Плюшевый осьминог с одним глазом', story: 'Баки выиграл в тире на Кони-Айленд', who: 'Хеди', pic: 'a one-eyed plush octopus' },
+    { name: 'Геймпад-медведь', desc: 'медведь, обнимающий приставку', who: 'Хеди' },
+    { name: 'Сэр Кракен', desc: 'тот же', who: 'Хеди' },
+] };
+const pl = await C.genKind('plush', { n: 3 });
+assert.equal(pl.length, 1, 'задел (приставка) и повтор отсеяны');
+assert.equal(pl[0].room, 'living'); assert.equal(pl[0].src, 'ai');
+assert.match(asked.msgs[0].content, /Плюшевый зоопарк/);
+assert.match(asked.msgs[1].content, /Заделы автора — НЕ трогать/);
+
+// 10. картинки вещей: предмет — без лиц, свидание — с лицами
+await C.drawItem(pl[0]);
+let last = drawn[drawn.length - 1];
+assert.match(last.prompt, /plain cream background/); assert.equal(last.o.refs.length, 0);
+const dt = C.addItem('date', { name: 'Каток в Брайант-парке', desc: 'коньки и какао', who: 'Хеди, Баки' });
+await C.drawItem(dt);
+last = drawn[drawn.length - 1];
+assert.ok(last.o.refs.length >= 1, 'свидание — с лицами'); assert.match(last.prompt, /reference image 1/);
+
+// 11. колода: тянуть по кругу
+for (const q of ['Что ты помнишь о нашем первом утре?', 'Какой звук для тебя — дом?']) C.addItem('card', { name: q });
+const k1 = C.drawCard(), k2 = C.drawCard(), k3 = C.drawCard();
+assert.notEqual(k1.id, k2.id, "сначала невытянутые");
+assert.ok(k3, "колода перемешалась заново");
+
+// 12. Летописец: новое в доме, записка, счастливый момент — и свайп их убирает
+ctx.chat = [{ name: 'Хеди', mes: 'Утро.', is_user: true, swipe_id: 0 }];
+const ws = api.worldState;
+api.worldState = () => ({ timestamp: { story_date: date, story_time: '9:00' }, scene: { location: 'штаб А.И.М.' } });
+assert.equal(C.chronHook(0), null, 'не дома и пост не про дом — Летописцу не надо');
+api.worldState = ws;
+assert.ok(C.chronHook(0), 'дома — смотрит каждый пост');
+ctx.chat.push({ name: 'Баки', mes: 'Баки купил вазу и оставил записку на холодильнике. Она смеялась.', swipe_id: 0, extra: { image: 'user/images/vase.png' } });
+C.bump();
+const hk = C.chronHook(1);
+assert.ok(hk && hk.key === '"dom": {}');
+const tt = C.afterPost(1, { dom: { new: [{ kind: 'decor', name: 'синяя ваза', who: 'Баки', room: 'kitchen' }], note: { from: 'Баки', to: 'Хеди', t: 'Ушёл за хлебом. Люблю. Б.' }, joy: 'она смеялась над его вазой' } }, ctx.chat[1]);
+assert.equal(tt.length, 3);
+assert.equal(C.suggestions().length, 1);
+assert.equal(C.itemsOf('note').length, 1); assert.equal(C.itemsOf('joy')[0].img, 'user/images/vase.png', 'картинка поста — в банку');
+ctx.chat[1].mes = 'Другой вариант поста.'; ctx.chat[1].swipe_id = 1; C.bump();
+assert.equal(C.itemsOf('note').length, 0, 'свайп — записка выпала');
+assert.equal(C.suggestions().length, 0);
+ctx.chat[1].mes = 'Баки купил вазу и оставил записку на холодильнике. Она смеялась.'; ctx.chat[1].swipe_id = 0; C.bump();
+assert.equal(C.itemsOf('note').length, 1, 'свайп назад — вернулась');
+const vase = C.acceptSugg(C.suggestions()[0].id);
+assert.equal(vase.room, 'kitchen'); assert.equal(C.placedIn('kitchen').length, 1);
+
+// 13. заметка модели: дома — уютные детали; разовая сцена — до ответа
+const bk = C.addItem('book', { name: 'Ледяной плен', author: 'Э. Шеклтон', page: 142 });
+bk.reading = true;
+let pn = C.promptNote('normal');
+assert.match(pn, /Баки сейчас читает «Ледяной плен»/); assert.match(pn, /записка от Баки/); assert.match(pn, /синяя ваза \(кухня/);
+C.shot('card', '[Вечер вдвоём: вопрос — «тест».]');
+assert.match(C.promptNote('normal'), /Вечер вдвоём/);
+C.spendShots(5);
+assert.doesNotMatch(C.promptNote('normal'), /Вечер вдвоём/, 'после ответа — отыграно');
+assert.equal(C.promptNote('quiet'), '');
+
+// 14. покупки: витрина → купить (без банка — без списания)
+reply = { items: [{ name: 'Лампа с зелёным абажуром', desc: 'как в библиотеке 40-х', price: 120, from: 'барахолка в Бруклине', room: 'living', spot: 'table', pic: 'green banker lamp' }] };
+const goods = await C.shopGen('light');
+assert.equal(goods.length, 1);
+const bought = await C.buy(goods[0]);
+assert.equal(bought.it.room, 'living'); assert.equal(bought.it.price, 120); assert.match(bought.paid, /не найден/);
+assert.equal(C.shopList('light').length, 0, 'с витрины ушло');
+
+// 15. перерисовать комнату с вещами: комната и вещи — рефами
+C.setItem(vase.id, { img: 'user/images/vase-pic.png' });
+await C.drawRoom(D.roomById('kitchen'), { withItems: true });
+last = drawn[drawn.length - 1];
+assert.match(last.prompt, /Keep this room exactly as in reference 1/);
+assert.match(last.prompt, /reference 2: синяя ваза \(на полке\)/);
+assert.equal(last.o.refs.length, 2);
+
+// 16. детская, имена, огород
+const cr = C.cribRoll(); assert.ok(cr.text.length > 10 && cr.roll >= 1);
+const nm = C.addItem('name', { name: 'Уинни', meaning: 'в честь бабушки' });
+C.vote(nm.id, 'Хеди', 'love'); C.vote(nm.id, 'Баки', 'ok');
+assert.equal(C.votesOf(nm), 3);
+assert.match(C.promptNote('normal'), /имена для дочки в шорт-листе: Уинни \(Хеди за\)/);
+const pt = C.addItem('plant', { name: 'Базилик' }); pt.planted = '2024-10-01';
+assert.equal(C.plantStage(pt), 3, 'посажен в октябре — взрослый к 21 ноября');
+
 console.log('дом · логика: все проверки прошли');

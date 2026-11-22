@@ -11,7 +11,13 @@ let api = null;
 function register() {
     const B = globalThis.LifeBridge;
     if (!B?.register) return false;
-    B.register({ id: ID, init(a) { api = a; C.setApi(a); } });
+    B.register({
+        id: ID,
+        init(a) { api = a; C.setApi(a); },
+        prompt: (type) => C.promptNote(type),
+        chron: (i) => C.chronHook(i),
+        afterPost: (i, j, m) => { const t = C.afterPost(i, j, m); if (t.length) C.toast('info', t.slice(0, 3).map(C.esc).join(' · ')); U.renderSoon(); },
+    });
     return true;
 }
 
@@ -41,7 +47,9 @@ function settingsDrawer() {
         <div class="inline-drawer-toggle inline-drawer-header"><b>✦ Дом</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
         <div class="inline-drawer-content">
             <label class="checkbox_label"><input type="checkbox" data-dmc="on" ${s.on ? 'checked' : ''}> Включено</label>
-            <label class="checkbox_label"><input type="checkbox" data-dmc="autoDraw" ${s.autoDraw ? 'checked' : ''}> Хэды рисуются сразу</label>
+            <label class="checkbox_label"><input type="checkbox" data-dmc="autoDraw" ${s.autoDraw ? 'checked' : ''}> Хэды и вещи рисуются сразу</label>
+            <label class="checkbox_label"><input type="checkbox" data-dmc="chron" ${s.chron ? 'checked' : ''}> Летописец замечает новое в доме, записки и хорошие моменты</label>
+            <label>Уютные детали модели <select data-dmc="prompt">${opt('auto', s.prompt, 'когда сцена дома')}${opt('always', s.prompt, 'всегда')}${opt('off', s.prompt, 'выкл')}</select></label>
             <label>Хэд-машина <select data-dmc="model">${opt('deep', s.model, 'умная модель Life (со сводом)')}${opt('chron', s.model, 'модель Летописца')}</select></label>
             <small>Палочка → «Дом», команда <code>/dom</code> (<code>/dom hc</code> — сразу хэд-машина). Нужен Life; картинки — через Гардероб.</small>
             <div class="menu_button" id="dm_open" style="margin-top:6px">Открыть</div>
@@ -51,6 +59,7 @@ function settingsDrawer() {
         const k = el.dataset.dmc;
         C.cfg()[k] = el.type === 'checkbox' ? el.checked : el.value;
         C.saveCfg();
+        try { api?.updatePrompt?.(); } catch { /* */ }
     }));
     document.getElementById('dm_open')?.addEventListener('click', () => U.open());
 }
@@ -60,7 +69,7 @@ function registerSlash() {
         const { SlashCommandParser, SlashCommand } = SillyTavern.getContext();
         SlashCommandParser.addCommandObject(SlashCommand.fromProps({
             name: 'dom',
-            helpString: 'Дом: комнаты, хэды на холодильнике, хэд-машина. /dom hc — сразу хэд-машина; /dom kitchen — кухня.',
+            helpString: 'Дом: этажи и комнаты, вещи, полки уюта, хэды на холодильнике. /dom hc — хэд-машина; /dom kitchen | living | nursery | roof — комната.',
             returns: 'ничего',
             unnamedArgumentList: [],
             callback: (_a, v) => {
@@ -88,10 +97,16 @@ jQuery(async () => {
     const iv = setInterval(() => {
         if (register()) { clearInterval(iv); console.log('[Дом] подключился к Life'); return; }
         if (++tries > 120) { clearInterval(iv); window.toastr?.warning?.('Дом живёт рядом с Life, а Life не найден или старый (нужен мост LifeBridge).', '✦ Дом', { timeOut: 12000 }); }
+        else if (tries === 2) C.bank();
     }, 500);
     try {
         const { eventSource, event_types: E } = SillyTavern.getContext();
-        eventSource.on(E.CHAT_CHANGED, () => { if (U.isOpen()) U.close(); });
+        eventSource.on(E.CHAT_CHANGED, () => { C.bump(); if (U.isOpen()) U.close(); });
+        const refresh = () => { C.bump(); try { api?.updatePrompt?.(); } catch { /* */ } U.renderSoon(); };
+        const onAi = (id, type) => { if (type === 'impersonate') return; const i = Number(id); if (Number.isFinite(i)) C.spendShots(i); refresh(); };
+        if (E.CHARACTER_MESSAGE_RENDERED) eventSource.on(E.CHARACTER_MESSAGE_RENDERED, onAi);
+        else if (E.MESSAGE_RECEIVED) eventSource.on(E.MESSAGE_RECEIVED, onAi);
+        for (const ev of [E.MESSAGE_SWIPED, E.MESSAGE_DELETED, E.MESSAGE_EDITED, E.MESSAGE_UPDATED]) if (ev) eventSource.on(ev, refresh);
         if (E.APP_READY) eventSource.on(E.APP_READY, () => { addWand(); settingsDrawer(); });
     } catch (e) { console.warn('[Дом] события', e); }
 });

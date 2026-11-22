@@ -11,7 +11,7 @@ export function setApi(a) { A = a; }
 
 const ctx = () => SillyTavern.getContext();
 export const MODULE = 'dom';
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 
 // ───────────── мелочи ─────────────
 
@@ -46,8 +46,10 @@ export function toast(kind, msg, title = '✦ Дом', opts = {}) {
 
 const DEF = {
     on: true,
-    autoDraw: true,      // хэды рисуются сразу, как только выпали
+    autoDraw: true,      // хэды и вещи рисуются сразу, как только появились
     model: 'deep',       // deep — умная модель Life (со сводом истории); chron — модель Летописца
+    chron: true,         // Летописец замечает новое в доме, записки и счастливые моменты
+    prompt: 'auto',      // auto — уютные детали модели, когда сцена дома; always; off
 };
 export function cfg() {
     const ext = ctx().extensionSettings;
@@ -58,14 +60,14 @@ export function cfg() {
 }
 export const saveCfg = () => { try { ctx().saveSettingsDebounced(); } catch { /* */ } };
 
-function blank() { return { v: 1, gen: [], rooms: {} }; }
+function blank() { return { v: 2, gen: [], rooms: {}, items: [], shots: [], sugg: [], shop: {}, nursery: {} }; }
 export function M() {
     const md = ctx().chatMetadata;
     if (!md) return blank();
     if (!md.dom || typeof md.dom !== 'object') md.dom = blank();
     const m = md.dom;
-    if (!Array.isArray(m.gen)) m.gen = [];
-    if (!m.rooms || typeof m.rooms !== 'object' || Array.isArray(m.rooms)) m.rooms = {};
+    for (const k of ['gen', 'items', 'shots', 'sugg']) if (!Array.isArray(m[k])) m[k] = [];
+    for (const k of ['rooms', 'shop', 'nursery']) if (!m[k] || typeof m[k] !== 'object' || Array.isArray(m[k])) m[k] = {};
     return m;
 }
 export const hasChat = () => { try { return A?.hasChat ? A.hasChat() : !!ctx().chatMetadata; } catch { return false; } };
@@ -346,16 +348,367 @@ export async function roomLore(room) {
     } catch { return ''; }
 }
 export const roomImg = (id) => M().rooms[`${id}:${eraKey()}`]?.img || '';
-export async function drawRoom(room) {
+/** Нарисовать комнату. withItems — перерисовать её же, добавив расставленные вещи (их картинки — рефами). */
+export async function drawRoom(room, { withItems = false } = {}) {
     if (!A?.drawPicture) throw new Error('Рисую через Life и Гардероб, а их нет');
     const y = storyYear();
     const lore = await roomLore(room);
-    const prompt = `Interior: ${room.en} in the home of Hedy and Bucky (${y < 1950 ? 'the 1940s, period-accurate' : `present day, ${y}`}).${lore ? `\nDetails from the story (keep them): ${lore}` : ''}
+    const refs = [];
+    const lines = [];
+    let roomRef = false;
+    if (withItems) {
+        const cur = roomImg(room.id);
+        if (cur) { const r = await refData(cur, 1280); if (r) { refs.push(r); roomRef = true; } }
+        const placed = placedIn(room.id);
+        for (const it of placed.slice(0, 6)) {
+            const r = refs.length < 4 && it.img ? await refData(it.img, 640) : null;
+            const where = it.spot ? ` (${D.spotName(it.spot)})` : '';
+            if (r) { refs.push(r); lines.push(`reference ${refs.length}: ${it.name}${where}`); }
+            else lines.push(`${it.name}${it.desc ? ` — ${cut(it.desc, 80)}` : ''}${where}`);
+        }
+    }
+    if (withItems && !lines.length) throw new Error('В комнате пока ничего не стоит — поставь вещи');
+    const keep = withItems && roomRef;
+    const base = keep
+        ? `Keep this room exactly as in reference 1 (same layout, light and style) and add these things, each in its place (the spot is in Russian): ${lines.join('; ')}.`
+        : `Interior: ${room.en} in the home of Hedy and Bucky (${y < 1950 ? 'the 1940s, period-accurate' : `present day, ${y}`}).${lore ? `\nDetails from the story (keep them): ${lore}` : ''}${lines.length ? `\nInclude these things, each in its place (the spot is in Russian): ${lines.join('; ')}.` : ''}`;
+    const prompt = `${base}
 Lived-in and cosy, warm light, small personal touches; no people, no text.
 Style: ${artStyle()}. Wide composition.`;
-    const img = await A.drawPicture(prompt, { aspect: '4:3', max: 1400, prefix: 'dom_room' });
+    const img = await A.drawPicture(prompt, { aspect: '4:3', max: 1400, refs, prefix: 'dom_room' });
     M().rooms[`${room.id}:${eraKey()}`] = { img, at: storyDay() || '' };
     touch();
     return img;
 }
 export async function setRoomImg(id, img) { M().rooms[`${id}:${eraKey()}`] = { img, at: storyDay() || '' }; touch(); }
+async function refData(path, max) { if (!path || !A?.refData) return null; try { return await A.refData(path, max); } catch { return null; } }
+
+// ───────────── посты: что пришло из истории, живёт, пока пост в чате ─────────────
+
+function hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+export const keyOf = (m) => `${m?.swipe_id ?? 0}:${hash(String(m?.mes || ''))}`;
+const chat = () => ctx().chat || [];
+let liveMemo = { sig: '', set: new Set() };
+export function liveKeys() {
+    const c = chat();
+    const sig = `${c.length}|${c.at(-1)?.mes?.length || 0}|${c.at(-1)?.swipe_id ?? 0}`;
+    if (liveMemo.sig !== sig) liveMemo = { sig, set: new Set(c.map(keyOf)) };
+    return liveMemo.set;
+}
+export const bump = () => { liveMemo.sig = ''; };
+const isLive = (x) => !x.post || liveKeys().has(x.post);
+
+// ───────────── вещи и полки ─────────────
+
+const NUMS = ['page', 'ver', 'year', 'n', 'max', 'price', 'roll'];
+export function normItem(kind, x, defaults = {}) {
+    const K = D.kindOf(kind);
+    const it = {
+        id: uid(), kind: D.KINDS[kind] ? kind : 'decor', name: cut(str(x?.name), 160), desc: cut(str(x?.desc), 600), story: cut(str(x?.story), 400),
+        who: cut(str(Array.isArray(x?.who) ? x.who.join(', ') : x?.who), 80), from: cut(str(x?.from), 80),
+        room: D.roomById(str(x?.room)) ? str(x.room) : (defaults.room ?? K.room ?? ''), spot: D.SPOTS.some(s => s[0] === str(x?.spot)) ? str(x.spot) : (defaults.spot || ''),
+        img: str(x?.img), pic: cut(str(x?.pic), 700), at: storyDay() || '', src: defaults.src || 'me', post: defaults.post || '',
+    };
+    if (it.room && !it.spot && K.place) it.spot = D.DEFAULT_SPOT[it.kind] || 'shelf';
+    for (const k of ['author', 'rule', 'cat', 'take', 'when', 'cost', 'artist', 'unit', 'day', 'meaning', 'care', 'to']) { const v = cut(str(x?.[k]), 300); if (v) it[k] = v; }
+    for (const k of NUMS) if (x?.[k] != null && Number.isFinite(Number(x[k]))) it[k] = Math.round(Number(x[k]));
+    if (kind === 'note') { it.from = cut(str(x?.from) || defaults.from || '', 60); it.to = cut(str(x?.to) || defaults.to || '', 60); }
+    if (kind === 'plant') it.planted = str(x?.planted) || storyDay() || '';
+    if (kind === 'hobby') { it.max = Math.max(1, it.max || 100); it.n = Math.max(0, Math.min(it.max, it.n || 0)); }
+    if (kind === 'name') it.votes = {};
+    if (kind === 'recipe') it.ver = Math.max(1, it.ver || 1);
+    if (!it.name) it.name = K.one;
+    return it;
+}
+export function addItem(kind, x, defaults = {}) { const it = x?.id && x?.kind ? x : normItem(kind, x, defaults); M().items.unshift(it); touch(); return it; }
+export const itemById = (id) => M().items.find(x => x.id === id) || null;
+export function setItem(id, patch) { const it = itemById(id); if (it) { Object.assign(it, patch); touch(); } return it; }
+export function delItem(id) { const m = M(); m.items = m.items.filter(x => x.id !== id); touch(); }
+export const itemsOf = (kind) => M().items.filter(x => x.kind === kind && isLive(x));
+export const placedIn = (room) => M().items.filter(x => isLive(x) && D.KINDS[x.kind]?.place && x.room === room);
+export const unplaced = () => M().items.filter(x => isLive(x) && D.KINDS[x.kind]?.place && !x.room);
+/** Растение: стадия по дням истории с посадки. */
+export function plantStage(it) {
+    const a = it.planted || it.at; const b = storyDay();
+    if (!a || !b) return 0;
+    const days = Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+    return days >= 60 ? 4 : days >= 30 ? 3 : days >= 12 ? 2 : days >= 4 ? 1 : 0;
+}
+export const PLANT_STAGE = ['посажено', 'росток', 'растёт', 'взрослое', 'урожай'];
+export const pair = () => defaultWho();
+
+/** Полка: придумать n штук (умная модель). opts.ask — пожелание; opts.roll — кубик (свидания); opts.from/to — записки. */
+export async function genKind(kind, { n = 3, ask = '', roll = 0, from = '', to = '', story = false } = {}) {
+    const K = D.kindOf(kind);
+    const who = pair();
+    const have = itemsOf(kind).map(x => x.name).slice(0, 40);
+    const pk = await planKeys();
+    const plans = [...hiddenPlans(), ...pk.titles];
+    const sys = `Ты — соавтор ролевой истории God Complex (AU по MCU, по-русски) и наполняешь их дом уютом. Сейчас: «${K.name}» — ${K.gen}. Нужно: ${n}.
+Правила: конкретно и по-ихнему, верно их характерам, истории и эпохе (дата ниже); без драмы; новое — не повторяй то, что уже есть; заделы автора не трогать даже намёком.${K.pic ? '\nК каждому — pic: один кадр для картинки по-английски (что на картинке; без текста на картинке).' : ''}
+Ответ — только JSON: {"items":[{"name":"","desc":"1–2 предложения","story":"откуда или почему, 1 предложение","who":"чьё или про кого"${K.extra ? `,${K.extra}` : ''}${K.pic ? ',"pic":""' : ''}}]}`;
+    const recent = kind === 'diary' || kind === 'note' ? lastPosts(4) : '';
+    const usr = [
+        eraLine(),
+        `Они: ${who.join(' и ')}.`,
+        roll ? `Кубик: ${roll} из 20 — ${D.dateTone(roll)}.` : '',
+        from || to ? `Записка${from ? ` от ${from}` : ''}${to ? ` для ${to}` : ''}.` : '',
+        str(ask) ? `Пожелание автора: ${cut(str(ask), 300)}.` : '',
+        have.length ? `Уже есть (не повторяй): ${have.join(' | ')}` : '',
+        plans.length ? `Заделы автора — НЕ трогать: ${plans.join('; ')}` : '',
+        recent ? `## Последние события\n${recent}` : '',
+        `## О них\n${aboutText(who) || 'по своду истории и канону'}`,
+    ].filter(Boolean).join('\n');
+    const useStory = story || ['joy', 'name', 'song', 'recipe', 'book'].includes(kind);
+    const j = await askJson(sys, usr, 2400, K.name, (x) => Array.isArray(x?.items) && x.items.length, useStory ? { who, pairs: true, world: false } : null);
+    const out = [];
+    for (const x of arr(j.items).slice(0, Math.max(n, 1) + 1)) {
+        if (!str(x?.name) && !str(x?.desc)) continue;
+        if (pk.re && (pk.re.test(`${x.name} ${x.desc} ${x.story}`) || pk.re.test(str(x.pic)))) continue;
+        if (isDup(`${x.name} ${x.desc}`, out.map(y => `${y.name} ${y.desc}`)) || [...have, ...out.map(y => y.name)].some(h => str(x.name) && norm(h) === norm(x.name))) continue;
+        const it = normItem(kind, { ...x, roll: roll || x.roll }, { src: 'ai', from, to });
+        if (kind === 'diary') it.day = it.day || storyDay();
+        out.push(it);
+    }
+    if (!out.length) throw new Error('Модель повторилась — попробуй ещё раз');
+    M().items.unshift(...out);
+    touch();
+    return out;
+}
+function lastPosts(k) {
+    const c = chat(); const out = [];
+    for (let i = c.length - 1; i >= 0 && out.length < k; i--) { const m = c[i]; if (!m || m.extra?.type === 'comment' || m.is_system) continue; out.unshift(`${m.name}: ${cut(plain(m.mes), 700)}`); }
+    return out.join('\n\n');
+}
+
+// ───────────── особые действия полок ─────────────
+
+/** Колода: тянуть карту (не тянутые — сначала). */
+export function drawCard() {
+    const all = itemsOf('card');
+    if (!all.length) return null;
+    let pool = all.filter(x => !x.drawn);
+    if (!pool.length) { for (const x of all) x.drawn = false; pool = all; }
+    const c = pool[Math.floor(Math.random() * pool.length)];
+    c.drawn = true; c.drawnAt = storyDay() || '';
+    touch();
+    return c;
+}
+/** Баки: сказка на ночь из книги — его голосом. */
+export async function bedtime(book) {
+    const sys = 'Ты пишешь за Баки Барнса (God Complex, AU по MCU, по-русски): он пересказывает Хеди на ночь кусочек из своей книги — она просит, для неё это сложнее квантовой физики. 5–7 предложений, его голос: спокойно, тепло, немного по-старомодному, с его комментариями. Без цитат из книги — своими словами. Ответ — только JSON: {"tale":""}';
+    const usr = `${eraLine()}\nКнига: «${book.name}»${book.author ? `, ${book.author}` : ''}. ${book.desc || ''}${book.page ? ` Закладка на странице ${book.page}.` : ''}`;
+    const j = await askJson(sys, usr, 1200, 'сказка на ночь', (x) => str(x?.tale), null);
+    book.tale = cut(str(j.tale), 1400);
+    touch();
+    return book.tale;
+}
+/** Догоняем век: что он думает (его голосом). */
+export async function catchTake(it) {
+    const sys = 'Ты — Баки Барнс (God Complex, AU по MCU, по-русски): человек из 40-х, догоняющий век. Скажи, что ты думаешь об этом — 1–3 предложения, твоим голосом: сдержанно, с сухим юмором, иногда трогательно. Ответ — только JSON: {"take":""}';
+    const j = await askJson(sys, `${eraLine()}\nЧто это: ${it.name}${it.cat ? ` (${it.cat})` : ''}. ${it.desc || ''}`, 900, 'Догоняем век', (x) => str(x?.take), null);
+    it.take = cut(str(j.take), 400); it.done = true;
+    touch();
+    return it.take;
+}
+/** Кроватка по инструкции: d20 и как прошла сборка. */
+export function cribRoll() {
+    const roll = d20();
+    const text = D.cribOf(roll);
+    M().nursery.crib = { roll, text, at: storyDay() || '' };
+    touch();
+    return { roll, text };
+}
+/** Голос за имя. */
+export function vote(id, who, v) { const it = itemById(id); if (!it) return; it.votes = it.votes || {}; if (it.votes[who] === v) delete it.votes[who]; else it.votes[who] = v; touch(); }
+export const votesOf = (it) => Object.values(it.votes || {}).reduce((a, v) => a + (v === 'love' ? 2 : v === 'ok' ? 1 : v === 'no' ? -2 : 0), 0);
+
+// ───────────── картинки вещей ─────────────
+
+export function itemPrompt(it, names = []) {
+    const K = D.kindOf(it.kind);
+    const y = storyYear();
+    const era = y < 1950 ? 'the 1940s, period-accurate' : `present day, ${y}`;
+    const base = str(it.pic) || `${it.name}. ${it.desc || ''}`;
+    const people = names.length ? `\nPeople in frame: ${names.map((n, i) => `${short(n)} — the person from reference image ${i + 1} (keep the face exactly)`).join('; ')}.` : '';
+    const st = artStyle();
+    switch (K.pic) {
+        case 'product': return `${base}\nA single object, centred, soft warm light on a plain cream background, cosy and detailed (${era}). Style: ${st}. No text, no letters, no logos, no real cover art.`;
+        case 'dish': return `${base}\nA homemade dish on a wooden table in a brick-walled kitchen, warm evening light, steam, cosy (${era}). Style: ${st}. No text.`;
+        case 'cat': return `${base}\nAlpine — a fluffy white cat — in a cosy apartment with red brick walls (${era}). Candid, funny, warm. Style: ${st}. No text.`;
+        case 'photo': return `${base}${people}\nA candid photograph (${era}), natural light, a real moment, slight film grain. No text.`;
+        default: return `${base}${people}\nSetting: ${era}. A cosy, warm, candid moment; gentle light. Style: ${st}. No text, no letters.`;
+    }
+}
+const PEOPLE_PIC = ['scene', 'photo'];
+export async function drawItem(it) {
+    if (!A?.drawPicture) throw new Error('Рисую через Life и Гардероб, а их нет');
+    const K = D.kindOf(it.kind);
+    const names = [];
+    const refs = [];
+    if (PEOPLE_PIC.includes(K.pic)) {
+        const who = cast().filter(n => !it.who || norm(it.who).includes(norm(short(n))));
+        for (const n of (who.length ? who : pair()).slice(0, 3)) { const r = await faceRef(n); if (r) { refs.push(r); names.push(n); } }
+    }
+    const img = await A.drawPicture(itemPrompt(it, names), { aspect: '1:1', max: 900, refs, prefix: `dom_${it.kind}`, who: names });
+    it.img = img;
+    touch();
+    return img;
+}
+
+// ───────────── картинки из чата (для фото на стенах) ─────────────
+
+export function chatImages(max = 40) {
+    const out = [];
+    const seen = new Set();
+    const c = chat();
+    for (let i = c.length - 1; i >= 0 && out.length < max; i--) {
+        const m = c[i];
+        if (!m) continue;
+        const list = [m.extra?.image, ...arr(m.extra?.image_swipes), ...[...String(m.mes || '').matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(x => x[1])];
+        for (const src of list) { const s = str(src); if (!s || seen.has(s) || /^data:image\/svg/.test(s)) continue; seen.add(s); out.push({ src: s, mes: i }); }
+    }
+    return out;
+}
+
+// ───────────── покупки: витрина от умной модели, оплата — банк Телефона ─────────────
+
+let bankMod = null;
+export async function bank() {
+    if (bankMod !== null) return bankMod;
+    try { const b = await import('/scripts/extensions/third-party/Phone-ST/bank.js'); bankMod = typeof b.getBank === 'function' ? b : false; } catch { bankMod = false; }
+    return bankMod;
+}
+export function balance() { if (!bankMod) return null; try { const bk = bankMod.getBank(); return { v: num(bk.balance), text: bankMod.fmtMoney(bk.balance) }; } catch { return null; } }
+export function money(n) { try { return bankMod?.fmtMoney ? bankMod.fmtMoney(n) : `$${Math.round(n).toLocaleString('ru-RU')}`; } catch { return `$${n}`; } }
+export const priceNum = (p) => { const s = String(p ?? '').replace(/\s/g, '').replace(',', '.'); const m = s.match(/-?\d+(\.\d+)?/); return m ? Math.round(Number(m[0])) : 0; };
+async function pay(amount, label) {
+    const b = await bank();
+    if (!b || !(amount > 0)) return { ok: false, why: b ? '' : 'банк Телефона не найден — без списания' };
+    try {
+        const bal = num(b.getBank().balance);
+        if (bal < amount) return { ok: false, why: `на счету ${b.fmtMoney(bal)} — не хватает` };
+        b.addTransaction({ amount: -amount, label: cut(label, 80), category: 'дом' });
+        return { ok: true };
+    } catch (e) { return { ok: false, why: String(e?.message || e) }; }
+}
+export async function shopGen(cat, ask = '', more = false) {
+    const name = D.SHOP_CATS.find(c => c[0] === cat)?.[1] || cat;
+    const have = M().shop[cat]?.list || [];
+    const sys = `Ты — продавец в ролевой истории God Complex: подбираешь вещи для дома Хеди и Баки (довоенный кирпичный дом на Манхэттене, уют, немного винтажа, у Хеди — гиковские штуки, у Баки — 40-е). Раздел: ${name}. 8 позиций разной цены: что это, каково вживую, кому из них понравится и почему. Цены — в долларах эпохи. Без брендов-подделок.
+Ответ — только JSON: {"items":[{"name":"","desc":"1–2 предложения","price":0,"from":"где продаётся","pic":"предмет для картинки по-английски","room":"kitchen|living|bedroom|nursery|roof|","spot":"shelf|wall|table|window|floor|bed|sofa|"}]}`;
+    const usr = `${eraLine()}${ask ? `\nПросьба: ${cut(ask, 200)}` : ''}${more && have.length ? `\nУже на витрине (не повторяй): ${have.map(x => x.name).join(', ')}` : ''}\nУ них дома уже есть: ${M().items.filter(x => D.KINDS[x.kind]?.place).map(x => x.name).slice(0, 30).join(', ') || 'почти ничего'}.`;
+    const j = await askJson(sys, usr, 2600, `покупки: ${name}`, (x) => Array.isArray(x?.items) && x.items.length, null);
+    const list = arr(j.items).filter(x => str(x?.name)).slice(0, 10).map(x => ({ ...x, _id: uid(), cat }));
+    M().shop[cat] = { at: Date.now(), list: more ? [...have, ...list] : list };
+    touch();
+    return M().shop[cat].list;
+}
+export const shopList = (cat) => M().shop[cat]?.list || [];
+export async function buy(x) {
+    const kind = D.SHOP_KIND[x.cat] || 'decor';
+    const price = priceNum(x.price);
+    let paid = '';
+    if (price > 0) {
+        const r = await pay(price, `Дом: ${x.name}`);
+        if (!r.ok && r.why && !/не найден/.test(r.why)) throw new Error(r.why);
+        paid = r.ok ? `−${money(price)}` : r.why;
+    }
+    const it = addItem(kind, { ...x, price }, { src: 'shop' });
+    const list = shopList(x.cat); const k = list.indexOf(x); if (k >= 0) list.splice(k, 1);
+    touch();
+    return { it, paid };
+}
+
+// ───────────── Летописец: новое в доме, записки, счастливые моменты ─────────────
+
+const CHRON_RULE = `dom — дом и уют по ЭТОМУ посту (только то, что в посте есть): {"new":[{"kind":"decor|plush|book|plant|photo|recipe|hobby|nursery","name":"что, 2–6 слов","who":"кто купил, подарил или сделал","room":"kitchen|living|bedroom|nursery|roof|"}],"read":"книга, которую Баки взялся читать, или пусто","note":{"from":"","to":"","t":"записка, если в посте её написали или оставили"},"joy":"счастливый тёплый момент поста, 4–12 слов, или пусто"}. Пустое не пиши; нечего — {}.`;
+const HOME_RE = /(?<![а-яё])дом(?![а-яё])|дома\b|квартир|кухн|гостин|спальн|детск|ванн|манхэттен|лавк|марко|крыш|холодильник|полк|диван/i;
+export function chronHook(i) {
+    if (!cfg().on || !cfg().chron || !hasChat()) return null;
+    const m = chat()[i];
+    const t = plain(m?.mes || '');
+    if (!HOME_RE.test(`${t} ${clock().loc}`) && !/купил|подарил|повесил|посадил|записк|книг|плюшев|игрушк|рецепт|счастлив|смеял|улыб/i.test(t)) return null;
+    const books = itemsOf('book').slice(0, 8).map(b => b.name);
+    return { key: '"dom": {}', rule: CHRON_RULE, input: `ДОМ: ${books.length ? `книги Баки: ${books.join(', ')}` : 'книг пока нет'}.`, tokens: 180 };
+}
+export function afterPost(i, j, msg) {
+    const d = j?.dom;
+    if (!d || typeof d !== 'object') return [];
+    const post = keyOf(msg || chat()[i]);
+    const out = [];
+    const m = M();
+    for (const x of arr(d.new).slice(0, 4)) {
+        const name = cut(str(x?.name), 80);
+        if (!name || m.items.some(y => norm(y.name) === norm(name)) || m.sugg.some(y => norm(y.name) === norm(name))) continue;
+        m.sugg.unshift({ id: uid(), kind: D.KINDS[str(x?.kind)] ? str(x.kind) : 'decor', name, who: cut(str(x?.who), 60), room: D.roomById(str(x?.room)) ? str(x.room) : '', post, mes: i });
+        out.push(`Новое в доме: ${name}`);
+    }
+    m.sugg = m.sugg.slice(0, 30);
+    const nt = d.note;
+    if (nt && str(nt.t) && !m.items.some(y => y.kind === 'note' && y.post === post)) { addItem('note', { name: cut(str(nt.t), 300), from: str(nt.from), to: str(nt.to) }, { src: 'post', post, from: str(nt.from), to: str(nt.to) }); out.push('Записка — на холодильнике'); }
+    if (str(d.joy) && !m.items.some(y => y.kind === 'joy' && y.post === post)) {
+        const img = chatImages(80).find(x => x.mes === i)?.src || '';
+        addItem('joy', { name: cut(str(d.joy), 160), img, day: storyDay() }, { src: 'post', post });
+        out.push('В банку хорошего — записка');
+    }
+    if (str(d.read)) {
+        const b = itemsOf('book').find(x => norm(x.name).includes(norm(d.read)) || norm(d.read).includes(norm(x.name)));
+        if (b) { for (const y of itemsOf('book')) y.reading = y === b; touch(); }
+        else if (!m.sugg.some(y => norm(y.name) === norm(d.read))) m.sugg.unshift({ id: uid(), kind: 'book', name: cut(str(d.read), 80), who: 'Баки', room: 'living', post, mes: i, read: true });
+    }
+    touch();
+    return out;
+}
+export const suggestions = () => M().sugg.filter(x => !x.post || liveKeys().has(x.post));
+export function acceptSugg(id) {
+    const m = M(); const x = m.sugg.find(y => y.id === id); if (!x) return null;
+    m.sugg = m.sugg.filter(y => y.id !== id);
+    const it = addItem(x.kind, { name: x.name, who: x.who, room: x.room }, { src: 'story' });
+    if (x.read) { for (const y of itemsOf('book')) y.reading = y === it; }
+    touch();
+    return it;
+}
+export function dropSugg(id) { const m = M(); m.sugg = m.sugg.filter(y => y.id !== id); touch(); }
+/** Из истории: что у них дома уже есть по свод/посты (вещи, подарки, покупки). */
+export async function fromStory() {
+    const sys = `Ты — архивист ролевой истории God Complex. Выпиши вещи, которые по истории есть у Хеди и Баки дома: покупки, подарки, декор, фото на стенах, книги, плюшевые, растения, вещи для малыша. Только то, что правда было; не выдумывай.
+Ответ — только JSON: {"items":[{"kind":"decor|plush|book|plant|photo|recipe|hobby|nursery","name":"","desc":"","who":"чьё или кто подарил","room":"kitchen|living|bedroom|nursery|roof|","spot":"shelf|wall|table|window|floor|bed|sofa|fridge|"}]}. Не больше 20.`;
+    const usr = `${eraLine()}\nУже есть (не повторяй): ${M().items.map(x => x.name).slice(0, 60).join(', ') || 'ничего'}.\n## Последние посты\n${lastPosts(10)}`;
+    const j = await askJson(sys, usr, 3200, 'из истории', (x) => Array.isArray(x?.items), { who: pair(), pairs: false, world: true });
+    return arr(j.items).filter(x => str(x?.name) && !M().items.some(y => norm(y.name) === norm(x.name)));
+}
+
+// ───────────── заметка модели и разовые сцены ─────────────
+
+export function shot(key, text) {
+    const m = M();
+    m.shots = m.shots.filter(x => x.key !== key);
+    m.shots.push({ id: uid(), key, text: cut(text, 900), at: chat().length - 1 });
+    touch();
+    try { A?.updatePrompt?.(); } catch { /* */ }
+}
+/** После ответа модели — разовые сцены отыграны. */
+export function spendShots(i) { const m = M(); const n = m.shots.length; m.shots = m.shots.filter(x => x.at >= i); if (m.shots.length !== n) touch(); }
+export const atHome = () => cfg().prompt === 'always' || HOME_RE.test(clock().loc);
+export function promptNote(type) {
+    if (!cfg().on || cfg().prompt === 'off' || !hasChat() || type === 'quiet' || type === 'impersonate') return '';
+    const out = [];
+    for (const s of M().shots) out.push(s.text);
+    if (!atHome()) return out.join('\n');
+    const lines = [];
+    const rd = itemsOf('book').find(b => b.reading);
+    if (rd) lines.push(`Баки сейчас читает «${rd.name}»${rd.author ? ` (${rd.author})` : ''}${rd.page ? `, закладка на ${rd.page}-й` : ''}`);
+    const notes = itemsOf('note').slice(0, 2);
+    if (notes.length) lines.push(`на холодильнике ${notes.map(n => `записка${n.from ? ` от ${short(n.from)}` : ''}: «${cut(n.name, 90)}»`).join('; ')}`);
+    const hb = itemsOf('hobby').find(h => h.n > 0 && h.n < h.max);
+    if (hb) lines.push(`${hb.name}: ${hb.n}/${hb.max}${hb.unit ? ` ${hb.unit}` : ''}`);
+    const fresh = M().items.filter(x => isLive(x) && D.KINDS[x.kind]?.place && x.room && x.src !== 'ai').slice(0, 3);
+    if (fresh.length) lines.push(`недавно в доме: ${fresh.map(x => `${x.name} (${D.roomById(x.room)?.name.toLowerCase()}${x.spot ? `, ${D.spotName(x.spot)}` : ''})`).join(', ')}`);
+    const nm = itemsOf('name').filter(x => votesOf(x) > 0).sort((a, b) => votesOf(b) - votesOf(a)).slice(0, 3);
+    if (nm.length) lines.push(`имена для дочки в шорт-листе: ${nm.map(x => `${x.name}${Object.entries(x.votes || {}).filter(([, v]) => v === 'love').map(([w]) => ` (${short(w)} за)`).join('')}`).join(', ')}`);
+    const cb = M().nursery.crib;
+    if (cb?.text && itemsOf('nursery').length) lines.push('в детской кроватка уже собрана');
+    if (lines.length) out.push(`[Дом — уютные детали (вплетай к месту, деталью, без пересказа и не как сюжет): ${lines.join('; ')}.]`);
+    return out.join('\n');
+}
