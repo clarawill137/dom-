@@ -429,3 +429,5 @@
 .dm-mags-hint { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #3c5b51; font-family: var(--hand); font-size: 18px; }
 .dm-magbig { display: grid; place-items: center; min-height: 180px; margin: 6px 0 10px; border-radius: 16px; background: radial-gradient(circle, rgba(255, 255, 255, .1), transparent 70%), var(--panel2); }
 .dm-magbig img { max-width: 70%; max-height: 220px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .4)); }
+/* 0.5.2: «Достать наугад» — под заголовком сам момент */
+.dm-bigcard .dm-bigtxt { margin: 6px 2px 8px; font-size: 15px; line-height: 1.45; color: var(--text); text-align: left; }

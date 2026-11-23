@@ -269,7 +269,11 @@ function fridgeHtml(r) {
 
 function modal(kind, extra = {}) { ui.modal = { kind, ...extra }; paintModal(); }
 function closeModal() { ui.modal = null; paintModal(); render(); }
-const sheetHead = (title) => `<div class="dm-sheet-h"><b>${title}</b><button class="dm-x" data-dm="closeModal">${ic('x')}</button></div>`;
+const sheetHead = (title) => `<div class="dm-sheet-h">${ui.modal?.from ? `<button class="dm-x" data-dm="modalBack" aria-label="Назад">${ic('back')}</button>` : ''}<b>${title}</b><button class="dm-x" data-dm="closeModal">${ic('x')}</button></div>`;
+/** Сколько строк нужно полю, чтобы текст был виден целиком, без прокрутки внутри (на телефоне ~34 буквы в строке). */
+const rowsFor = (v, min = 2, max = 16) => Math.max(min, Math.min(max, String(v ?? '').split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 34)), 0)));
+/** Хорошее из банки одной строкой — для сцены: «что» и «как было». */
+const joyLine = (it) => [it.name, it.desc].map(x => String(x || '').trim().replace(/[.!…\s]+$/, '')).filter(Boolean).join(' — ').replace(/\|/g, '/');
 function paintModal() {
     const box = document.querySelector('#dm-app .dm-modal');
     if (!box) return;
@@ -323,7 +327,7 @@ function shelfSheet() {
 function showCard(sh) {
     if (sh.type === 'card') return `<div class="dm-bigcard"><small>карта</small><p>${esc(sh.t)}</p><div class="dm-actions">${btn('scene', `${ic('send')} В сцену`, attr({ v: `card|${sh.t}` }), 'primary')}${btn('drawCardDeck', `${ic('cards')} Ещё`, '', 'ghost')}</div></div>`;
     if (sh.type === 'crib') return `<div class="dm-bigcard crib">${dieHtml(sh.roll, false)}<p>${esc(sh.t)}</p><div class="dm-actions">${btn('scene', `${ic('send')} В сцену`, attr({ v: `crib|${sh.t}` }), 'primary')}</div></div>`;
-    if (sh.type === 'joy') { const it = C.itemById(sh.id); return it ? `<div class="dm-bigcard joy">${it.img ? `<span class="dm-bigpic" style="background-image:url('${esc(it.img)}')"></span>` : ''}<p>${esc(it.name)}</p>${it.day ? `<small>${esc(it.day)}</small>` : ''}<div class="dm-actions">${btn('scene', `${ic('send')} Вспомнить в сцене`, attr({ v: `joy|${it.name}` }), 'primary')}${btn('joyRandom', `${ic('jar')} Ещё`, '', 'ghost')}</div></div>` : ''; }
+    if (sh.type === 'joy') { const it = C.itemById(sh.id); return it ? `<div class="dm-bigcard joy">${it.img ? `<span class="dm-bigpic" style="background-image:url('${esc(it.img)}')"></span>` : ''}<p>${esc(it.name)}</p>${it.desc ? `<div class="dm-bigtxt">${esc(it.desc)}</div>` : ''}${it.day ? `<small>${esc(it.day)}</small>` : ''}<div class="dm-actions">${btn('scene', `${ic('send')} Вспомнить в сцене`, attr({ v: `joy|${joyLine(it)}` }), 'primary')}${btn('joyRandom', `${ic('jar')} Ещё`, '', 'ghost')}</div></div>` : ''; }
     if (sh.type === 'date') { const it = C.itemById(sh.id); return it ? `<div class="dm-bigcard date">${dieHtml(it.roll || '?', false)}<p><b>${esc(it.name)}</b>${it.desc ? `<br>${esc(it.desc)}` : ''}</p><div class="dm-actions">${btn('toCal', `${ic('calendar')} В календарь`, attr({ v: it.id }), 'primary')}${btn('scene', `${ic('send')} В сцену`, attr({ v: `date|${it.name}. ${it.desc || ''}` }), '')}</div></div>` : ''; }
     return '';
 }
@@ -362,7 +366,7 @@ function itemSheet() {
     const K = D.kindOf(it.kind);
     const k = `item:${it.id}`;
     const f = (key, label, type = 'text') => `<label class="dm-field"><span>${esc(label)}</span><input type="${type}" data-dmf="it:${key}" data-id="${esc(it.id)}" value="${esc(it[key] ?? '')}"></label>`;
-    const a = (key, label, rows = 2) => `<label class="dm-field"><span>${esc(label)}</span><textarea rows="${rows}" data-dmf="it:${key}" data-id="${esc(it.id)}">${esc(it[key] ?? '')}</textarea></label>`;
+    const a = (key, label, rows = 2) => `<label class="dm-field"><span>${esc(label)}</span><textarea rows="${rowsFor(it[key], rows)}" data-dmf="it:${key}" data-id="${esc(it.id)}">${esc(it[key] ?? '')}</textarea></label>`;
     const pic = K.pic || K.place ? `<div class="dm-itempic${it.img ? '' : ' empty'}"${it.img ? ` style="background-image:url('${esc(it.img)}')" data-dm="zoom" data-v="${esc(it.img)}"` : ''}>
         ${busy(k) ? `<span class="dm-drawing">${spin}<small>рисую…</small></span>` : it.img ? '' : ic(K.ico, 'xl')}
         <div class="dm-roompic-tools">${btn('drawItem', busy(k) ? spin : `${ic('brush')}${it.img ? '' : ' Нарисовать'}`, attr({ v: it.id }), 'sm glass')}<label class="dm-btn sm glass">${ic('upload')}<input type="file" accept="image/*" data-dmup="item" data-id="${esc(it.id)}" hidden></label></div>
@@ -375,15 +379,15 @@ function itemSheet() {
     if (it.kind === 'song') acts.push(btn('scene', `${ic('send')} Играет в сцене`, attr({ v: `song|${it.name}${it.artist ? ` — ${it.artist}` : ''}` }), 'primary'));
     if (it.kind === 'plush') acts.push(btn('scene', `${ic('send')} Хеди находит`, attr({ v: `plush|${it.name}` }), ''));
     if (it.kind === 'card') acts.push(btn('scene', `${ic('send')} В сцену`, attr({ v: `card|${it.name}` }), 'primary'));
-    if (it.kind === 'joy') acts.push(btn('scene', `${ic('send')} Вспомнить в сцене`, attr({ v: `joy|${it.name}` }), 'primary'));
+    if (it.kind === 'joy') acts.push(btn('scene', `${ic('send')} Вспомнить в сцене`, attr({ v: `joy|${joyLine(it)}` }), 'primary'));
     if (it.kind === 'note') acts.push(btn('noteReply', busy(`reply:${it.id}`) ? spin : `${ic('note')} Ответить`, attr({ id: it.id }), 'primary'));
     if (it.kind === 'plant') acts.push(btn('water', `${ic('drop')} Полить`, attr({ id: it.id }), ''));
     return `<div class="dm-sheet">${sheetHead(`${ic(K.ico)} ${esc(K.one.charAt(0).toUpperCase() + K.one.slice(1))}`)}
         ${pic}
         ${it.tale ? `<div class="dm-tale"><small>Сказка на ночь — его голосом</small><p>${esc(it.tale)}</p>${btn('scene', `${ic('send')} Рассказывает в сцене`, attr({ v: `tale|${it.name}|${it.tale}` }), 'sm')}</div>` : ''}
         ${acts.length ? `<div class="dm-actions">${acts.join('')}</div>` : ''}
-        ${it.kind === 'note' ? a('name', 'Записка', 3) : f('name', K.one === 'карта' ? 'Вопрос' : 'Что это')}
-        ${['card', 'note', 'joy'].includes(it.kind) ? '' : a('desc', 'Описание')}
+        ${it.kind === 'note' ? a('name', 'Записка', 3) : it.kind === 'joy' ? a('name', 'Что было хорошего', 1) : it.kind === 'card' ? a('name', 'Вопрос', 1) : f('name', 'Что это')}
+        ${['card', 'note'].includes(it.kind) ? '' : a('desc', it.kind === 'joy' ? 'Как это было' : 'Описание')}
         ${(FIELDS[it.kind] || []).map(([key, label, type]) => f(key, label, type)).join('')}
         ${['card', 'joy', 'diary'].includes(it.kind) ? '' : f('who', 'Чьё / про кого')}
         ${K.place ? `<div class="dm-grid2"><label class="dm-field"><span>Комната</span><select data-dmf="it:room" data-id="${esc(it.id)}"><option value="">— не расставлено</option>${D.placeRooms().map(r => `<option value="${r.id}" ${it.room === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
@@ -673,7 +677,8 @@ const HANDLERS = {
     bedtime: (el) => { const it = C.itemById(el.dataset.id); withBusy(`tale:${it.id}`, () => C.bedtime(it)); },
     verUp: (el) => { const it = C.itemById(el.dataset.id); it.ver = (it.ver || 1) + 1; C.touch(); paintModal(); },
     scene: (el) => toScene(el.dataset.v),
-    item: (el) => modal('item', { id: el.dataset.v }),
+    item: (el) => modal('item', { id: el.dataset.v, from: ui.modal?.kind === 'shelf' ? { kind: 'shelf', k: ui.modal.k } : null }),
+    modalBack: () => { const f = ui.modal?.from; if (f) modal(f.kind, { k: f.k }); else closeModal(); },
     drawItem: (el) => { const it = C.itemById(el.dataset.v); if (!it) return; withBusy(`item:${it.id}`, () => C.drawItem(it)); },
     delItem: (el) => { if (!confirm('Убрать?')) return; C.delItem(el.dataset.id); closeModal(); },
     // вещи, покупки, из постов
