@@ -179,7 +179,7 @@ function homeHtml() {
             ${Post.can() ? `<button data-dm="post" class="${Post.atDoor().length ? 'hot' : ''}">${ic('box')}<span>Посылки${Post.atDoor().length ? ` · ${Post.atDoor().length}` : Post.onWay().length ? ` · ${Post.onWay().length}` : ''}</span></button>` : ''}
             <button data-dm="inv">${ic('lamp')}<span>Вещи${inv ? ` · ${inv}` : ''}</span></button>
             <button data-dm="sugg" class="${sg ? 'hot' : ''}">${ic('bell')}<span>Из постов${sg ? ` · ${sg}` : ''}</span></button>
-            <button data-dm="roll">${ic('frame')}<span>Плёнка${Cz.roll().length ? ` · ${Cz.roll().length}` : ''}</span></button>
+            <button data-dm="film">${ic('frame')}<span>Плёнка${Cz.roll().length ? ` · ${Cz.roll().length}` : ''}</span></button>
             <button data-dm="chores">${ic('wand')}<span>Дела${Chores.open().length ? ` · ${Chores.open().length}` : ''}</span></button>
             ${Board.boardRoom() ? `<button data-dm="mags">${ic('pin')}<span>${esc(Board.styleOf().title.split(' ')[0])}${Board.on(Board.boardRoom().id).length ? ` · ${Board.on(Board.boardRoom().id).length}` : ''}</span></button>` : ''}
             ${Growth.can() ? `<button data-dm="growth">${ic('ruler')}<span>Рост</span></button>` : ''}
@@ -700,8 +700,10 @@ const HANDLERS = {
     formSave: async () => { const f = ui.modal; const r = await f.onSave(formVals()); if (r === false) { C.toast('info', 'Заполни главное'); return; } if (r !== 'keep' && ui.modal === f) closeModal(); else render(); },
 };
 
+// Плёнка открывается по «film»: «roll» — это «Крутить» хэд-машины (0.1). В 0.4 плёнка тоже звалась «roll» и
+// перезаписала его — «Крутить» выкидывало на фотоплёнку (её слова 23.11). Имена ловит tests/handlers.test.mjs.
 Object.assign(HANDLERS, {
-    roll: () => { ui.roll.sel = ''; modal('roll'); },
+    film: () => { ui.roll.sel = ''; modal('roll'); },
     rollF: (el) => { ui.roll.f = el.dataset.v; paintModal(); },
     rollSel: (el) => { ui.roll.sel = ui.roll.sel === el.dataset.v ? '' : el.dataset.v; paintModal(); },
     rollSnap: (el) => { const k = el.dataset.v; if (k === 'own' && !ui.roll.ask.trim()) { C.toast('info', 'Опиши кадр'); return; } withBusy(`roll:${k}`, async () => { const x = await Cz.snap(k, k === 'own' ? ui.roll.ask : ''); ui.roll.sel = x.id; if (k === 'own') ui.roll.ask = ''; }); },
